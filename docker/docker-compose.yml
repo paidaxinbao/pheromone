@@ -1,8 +1,6 @@
 # Agent Swarm - 3 个 OpenClaw Agent 容器
 # 初始阶段：Agent 之间通过 GitHub 协作
 
-version: '3.8'
-
 services:
   # Developer Agent
   developer:
@@ -15,7 +13,6 @@ services:
       - OPENCLAW_MODEL=bailian/qwen3.5-plus
     volumes:
       - developer-workspace:/root/.openclaw/workspace
-      - ../agents/developer:/workspace/agents/developer:ro
     networks:
       - agent-network
     ports:
@@ -33,7 +30,6 @@ services:
       - OPENCLAW_MODEL=bailian/qwen3.5-plus
     volumes:
       - reviewer-workspace:/root/.openclaw/workspace
-      - ../agents/reviewer:/workspace/agents/reviewer:ro
     networks:
       - agent-network
     ports:
@@ -53,7 +49,6 @@ services:
       - OPENCLAW_MODEL=bailian/qwen3.5-plus
     volumes:
       - tester-workspace:/root/.openclaw/workspace
-      - ../agents/tester:/workspace/agents/tester:ro
     networks:
       - agent-network
     ports:

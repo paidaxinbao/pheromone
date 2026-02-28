@@ -16,7 +16,9 @@ WORKDIR /root/.openclaw/workspace
 # 复制 Agent 配置
 COPY agents/developer/SOUL.md ./SOUL.md
 COPY agents/developer/AGENTS.md ./AGENTS.md
-COPY agents/developer/TOOLS.md ./TOOLS.md 2>/dev/null || echo "# Tools config" > ./TOOLS.md
+
+# 创建 TOOLS.md
+RUN echo "# Tools config" > ./TOOLS.md
 
 # 创建记忆目录
 RUN mkdir -p memory

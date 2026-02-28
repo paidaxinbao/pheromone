@@ -3,7 +3,6 @@ FROM node:20-alpine
 
 RUN apk add --no-cache git openssh-client curl
 WORKDIR /app
-
 RUN npm install -g openclaw@latest
 WORKDIR /root/.openclaw/workspace
 
