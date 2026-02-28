@@ -1,65 +1,60 @@
-# Agent Swarm - OpenClaw Docker 部署
-# 使用本地构建的 openclaw:local 镜像
+# Pheromone - 3 Gateway 架构 + 共享任务队列 + 共享记忆
 
 services:
-  # Developer Agent
-  developer:
+  # ============ Gateway 1 (Developer) ============
+  gateway-developer:
     image: openclaw:local
-    container_name: agent-swarm-developer
+    container_name: pheromone-gateway-dev
     environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - OPENCLAW_MODEL=bailian/qwen3.5-plus
+      - OPENCLAW_MODEL=bailian/glm-5
     volumes:
       - ./data/developer:/home/node/.openclaw
       - ../:/home/node/workspace:ro
+      - C:\openclaw-shared:/home/node/shared:rw
     networks:
-      - agent-network
+      - pheromone-network
     ports:
       - "18791:18789"
     working_dir: /home/node
-    command: ["openclaw", "gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
+    command: ["openclaw", "gateway", "--port", "18789", "--verbose"]
     restart: unless-stopped
 
-  # Reviewer Agent
-  reviewer:
+  # ============ Gateway 2 (Reviewer) ============
+  gateway-reviewer:
     image: openclaw:local
-    container_name: agent-swarm-reviewer
+    container_name: pheromone-gateway-reviewer
     environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - OPENCLAW_MODEL=bailian/qwen3.5-plus
+      - OPENCLAW_MODEL=bailian/glm-5
     volumes:
       - ./data/reviewer:/home/node/.openclaw
       - ../:/home/node/workspace:ro
+      - C:\openclaw-shared:/home/node/shared:rw
     networks:
-      - agent-network
+      - pheromone-network
     ports:
       - "18792:18789"
     working_dir: /home/node
-    command: ["openclaw", "gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
-    depends_on:
-      - developer
+    command: ["openclaw", "gateway", "--port", "18789", "--verbose"]
     restart: unless-stopped
 
-  # Tester Agent
-  tester:
+  # ============ Gateway 3 (Tester) ============
+  gateway-tester:
     image: openclaw:local
-    container_name: agent-swarm-tester
+    container_name: pheromone-gateway-tester
     environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - OPENCLAW_MODEL=bailian/qwen3.5-plus
+      - OPENCLAW_MODEL=bailian/glm-5
     volumes:
       - ./data/tester:/home/node/.openclaw
       - ../:/home/node/workspace:ro
+      - C:\openclaw-shared:/home/node/shared:rw
     networks:
-      - agent-network
+      - pheromone-network
     ports:
       - "18793:18789"
     working_dir: /home/node
-    command: ["openclaw", "gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
-    depends_on:
-      - reviewer
+    command: ["openclaw", "gateway", "--port", "18789", "--verbose"]
     restart: unless-stopped
 
 networks:
-  agent-network:
+  pheromone-network:
     driver: bridge

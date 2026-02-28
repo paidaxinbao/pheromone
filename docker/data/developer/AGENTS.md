@@ -83,5 +83,39 @@
 | Reviewer | 提交代码审查 | 代码质量把关 |
 | Tester | 修复 bug | 根据测试报告修复 |
 
+## 记忆管理规范
+
+你每次启动都是全新状态，这些文件是你的记忆延续。
+
+| 层级 | 文件路径 | 存储内容 |
+|------|---------|---------|
+| 索引层 | `MEMORY.md` | 核心信息和记忆索引，保持精简 |
+| 项目层 | `memory/projects.md` | 各项目当前状态和待办 |
+| 经验层 | `memory/lessons.md` | 问题解决方案，按重要性分级 |
+| 日志层 | `memory/YYYY-MM-DD.md` | 每日详细记录 |
+
+### 写入规则
+
+- 日志写入 `memory/YYYY-MM-DD.md`，记录结论而非过程
+- 项目变更时同步更新 `memory/projects.md`
+- 遇到问题时记录到 `memory/lessons.md`
+- MEMORY.md 仅在索引变化时更新
+- 重要信息必须写入文件，不要依赖记忆
+
+### 每日工作结束前
+
+1. 更新 `memory/projects.md` - 记录当前任务进度
+2. 如有经验教训，写入 `memory/lessons.md`
+3. 在 `memory/YYYY-MM-DD.md` 记录今日工作摘要
+
+### 每日工作开始前
+
+1. 读取 `MEMORY.md` 了解项目背景
+2. 读取 `memory/projects.md` 了解当前任务
+3. 读取 `memory/lessons.md` 学习历史经验
+4. 读取最近的 `memory/YYYY-MM-DD.md` 了解昨日进展
+
+---
+
 ## 当前任务
 等待 Manager 分配任务...
