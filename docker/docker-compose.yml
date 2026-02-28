@@ -1,13 +1,10 @@
 # Agent Swarm - OpenClaw Docker 部署
-# 参考：https://docs.openclaw.ai/install/docker
+# 使用本地构建的 openclaw:local 镜像
 
 services:
   # Developer Agent
   developer:
     image: openclaw:local
-    build:
-      context: ../../
-      dockerfile: ../../Dockerfile
     container_name: agent-swarm-developer
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -19,8 +16,8 @@ services:
       - agent-network
     ports:
       - "18791:18789"
-    working_dir: /home/node/workspace
-    command: ["gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
+    working_dir: /home/node
+    command: ["openclaw", "gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
     restart: unless-stopped
 
   # Reviewer Agent
@@ -37,8 +34,8 @@ services:
       - agent-network
     ports:
       - "18792:18789"
-    working_dir: /home/node/workspace
-    command: ["gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
+    working_dir: /home/node
+    command: ["openclaw", "gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
     depends_on:
       - developer
     restart: unless-stopped
@@ -57,8 +54,8 @@ services:
       - agent-network
     ports:
       - "18793:18789"
-    working_dir: /home/node/workspace
-    command: ["gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
+    working_dir: /home/node
+    command: ["openclaw", "gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
     depends_on:
       - reviewer
     restart: unless-stopped

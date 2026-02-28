@@ -18,9 +18,7 @@ WORKDIR /app
 # 安装 OpenClaw
 RUN npm install -g openclaw@latest
 
-# 创建非 root 用户
-RUN useradd -m -u 1000 node
-
+# node 用户已存在于 node:22-bookworm-slim 镜像中
 # 创建工作目录
 RUN mkdir -p /home/node/workspace && chown -R node:node /home/node
 

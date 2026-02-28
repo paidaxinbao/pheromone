@@ -1,9 +1,28 @@
 {
-  "agent": {
-    "model": "bailian/qwen3.5-plus"
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "bailian/qwen3.5-plus"
+      },
+      "compaction": {
+        "mode": "safeguard"
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
   },
   "gateway": {
-    "bind": "0.0.0.0",
-    "port": 18789
+    "auth": {
+      "mode": "token",
+      "token": "049a5c2116afea9ed36c33d6624094eda983cf89db29fe70"
+    }
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.2.26",
+    "lastTouchedAt": "2026-02-28T10:25:24.482Z"
   }
 }
