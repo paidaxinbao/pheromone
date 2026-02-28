@@ -1,0 +1,2 @@
+Set UAC = CreateObject("Shell.Application")
+UAC.ShellExecute "powershell.exe", "-NoProfile -ExecutionPolicy Bypass -File `"C:\Users\panxinyu\.openclaw\workspace\agent-swarm\setup-task.ps1`"", "", "runas", 1
