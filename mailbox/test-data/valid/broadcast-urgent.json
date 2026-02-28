@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440006",
+  "type": "message.broadcast",
+  "version": "1.0.0",
+  "timestamp": "2026-03-01T01:00:00.000Z",
+  "sender": {
+    "id": "agent-manager-001",
+    "role": "manager"
+  },
+  "payload": {
+    "subject": "系统维护通知",
+    "content": "将于 **10 分钟后** 进行系统维护，请保存当前工作进度。",
+    "contentType": "markdown",
+    "urgent": true
+  },
+  "metadata": {
+    "priority": "urgent",
+    "ttl": 600
+  }
+}

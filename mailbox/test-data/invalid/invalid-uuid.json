@@ -1,0 +1,11 @@
+{
+  "id": "not-a-uuid",
+  "type": "task.assign",
+  "version": "1.0.0",
+  "timestamp": "2026-03-01T01:00:00.000Z",
+  "sender": {
+    "id": "agent-manager-001",
+    "role": "manager"
+  },
+  "payload": {}
+}

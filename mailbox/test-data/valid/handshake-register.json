@@ -1,0 +1,26 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440005",
+  "type": "handshake.register",
+  "version": "1.0.0",
+  "timestamp": "2026-03-01T01:00:00.000Z",
+  "sender": {
+    "id": "agent-developer-001",
+    "role": "developer"
+  },
+  "payload": {
+    "agent": {
+      "id": "agent-developer-001",
+      "role": "developer",
+      "name": "Dev Agent Alpha",
+      "capabilities": [
+        "code.read",
+        "code.write",
+        "code.execute",
+        "git.read",
+        "git.write",
+        "test.run"
+      ]
+    },
+    "token": "dev-token-abc123xyz789"
+  }
+}

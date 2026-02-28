@@ -1,0 +1,31 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440004",
+  "type": "task.complete",
+  "version": "1.0.0",
+  "timestamp": "2026-03-01T01:00:00.000Z",
+  "sender": {
+    "id": "agent-developer-001",
+    "role": "developer"
+  },
+  "payload": {
+    "taskId": "task-feature-auth-001",
+    "result": {
+      "success": true,
+      "output": "认证模块开发完成，测试通过率 100%",
+      "artifacts": [
+        {
+          "type": "file",
+          "path": "src/auth/jwt.js"
+        },
+        {
+          "type": "file",
+          "path": "tests/auth.test.js"
+        }
+      ]
+    },
+    "summary": "完成了 JWT 认证模块，包括登录、注册、令牌刷新功能"
+  },
+  "metadata": {
+    "correlationId": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
