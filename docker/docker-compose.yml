@@ -1,0 +1,91 @@
+# Agent Swarm - Docker Compose 配置
+# 多容器编排
+
+version: '3.8'
+
+services:
+  # Mailbox Hub - 消息中转站
+  mailbox-hub:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: agent-swarm-hub
+    ports:
+      - "18790:18790"
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18790/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Developer Agent
+  developer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: agent-swarm-developer
+    environment:
+      - AGENT_ID=developer
+      - AGENT_ROLE=developer
+      - MAILBOX_URL=http://mailbox-hub:18790
+      - OPENCLAW_WORKSPACE=/app/agents/developer
+    volumes:
+      - ../agents/developer:/app/agents/developer:ro
+      - developer-sandbox:/app/sandbox
+    networks:
+      - agent-network
+    depends_on:
+      - mailbox-hub
+    restart: unless-stopped
+
+  # Reviewer Agent
+  reviewer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: agent-swarm-reviewer
+    environment:
+      - AGENT_ID=reviewer
+      - AGENT_ROLE=reviewer
+      - MAILBOX_URL=http://mailbox-hub:18790
+      - OPENCLAW_WORKSPACE=/app/agents/reviewer
+    volumes:
+      - ../agents/reviewer:/app/agents/reviewer:ro
+      - reviewer-sandbox:/app/sandbox
+    networks:
+      - agent-network
+    depends_on:
+      - mailbox-hub
+    restart: unless-stopped
+
+  # Tester Agent
+  tester:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    container_name: agent-swarm-tester
+    environment:
+      - AGENT_ID=tester
+      - AGENT_ROLE=tester
+      - MAILBOX_URL=http://mailbox-hub:18790
+      - OPENCLAW_WORKSPACE=/app/agents/tester
+    volumes:
+      - ../agents/tester:/app/agents/tester:ro
+      - tester-sandbox:/app/sandbox
+    networks:
+      - agent-network
+    depends_on:
+      - mailbox-hub
+    restart: unless-stopped
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  developer-sandbox:
+  reviewer-sandbox:
+  tester-sandbox:

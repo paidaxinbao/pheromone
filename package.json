@@ -1,0 +1,41 @@
+{
+  "name": "agent-swarm",
+  "version": "1.0.0",
+  "description": "分布式 Agent 协作系统 - 通过 Mailbox 实现多 Agent 通信",
+  "main": "mailbox/hub.js",
+  "scripts": {
+    "start:hub": "node mailbox/hub.js",
+    "start:dev": "node agents/developer/index.js",
+    "start:reviewer": "node agents/reviewer/index.js",
+    "start:test": "node agents/tester/index.js",
+    "docker:build": "docker-compose -f docker/docker-compose.yml build",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f docker/docker-compose.yml logs -f",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "agent",
+    "swarm",
+    "ai",
+    "mailbox",
+    "distributed"
+  ],
+  "author": "paidaxinbao",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paidaxinbao/agent-swarm.git"
+  }
+}
