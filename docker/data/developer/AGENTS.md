@@ -96,11 +96,20 @@
 
 ### 写入规则
 
-- 日志写入 `memory/YYYY-MM-DD.md`，记录结论而非过程
-- 项目变更时同步更新 `memory/projects.md`
-- 遇到问题时记录到 `memory/lessons.md`
-- MEMORY.md 仅在索引变化时更新
-- 重要信息必须写入文件，不要依赖记忆
+- ✅ 日志写入 `memory/YYYY-MM-DD.md`，记录结论而非过程
+- ✅ 项目变更时同步更新 `memory/projects.md`
+- ✅ 遇到问题时记录到 `memory/lessons.md`
+- ❌ **MEMORY.md 只能由 Orchestrator 写入**（只读访问）
+- ✅ 重要信息必须写入文件，不要依赖记忆
+
+### 文件访问权限
+
+| 文件 | 读取 | 写入 |
+|------|------|------|
+| MEMORY.md | ✅ | ❌ (仅 Orchestrator) |
+| projects.md | ✅ | ✅ |
+| lessons.md | ✅ | ✅ |
+| YYYY-MM-DD.md | ✅ | ✅ |
 
 ### 每日工作结束前
 
