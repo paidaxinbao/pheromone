@@ -1,118 +1,85 @@
-# Agent Swarm - Docker 部署
+# Agent Swarm - Docker 部署指南
 
-## 快速启动
+## 重要说明
 
-### 1. 配置环境变量
+OpenClaw **没有官方预构建的 Docker 镜像**，需要本地构建。
 
-复制 `.env.example` 为 `.env`：
-```bash
-cp .env.example .env
+由于构建复杂（需要 Node.js 22+ 和大量依赖），建议使用以下替代方案：
+
+---
+
+## 方案：本地运行多个 Agent（推荐）
+
+不使用 Docker，直接在本地运行 3 个独立的 OpenClaw 实例：
+
+### 1. 创建 3 个工作空间
+
+```powershell
+# Developer Agent
+mkdir ~/.openclaw/agent-developer
+cp agents/developer/SOUL.md ~/.openclaw/agent-developer/
+cp agents/developer/AGENTS.md ~/.openclaw/agent-developer/
+
+# Reviewer Agent
+mkdir ~/.openclaw/agent-reviewer
+cp agents/reviewer/SOUL.md ~/.openclaw/agent-reviewer/
+cp agents/reviewer/AGENTS.md ~/.openclaw/agent-reviewer/
+
+# Tester Agent
+mkdir ~/.openclaw/agent-tester
+cp agents/tester/SOUL.md ~/.openclaw/agent-tester/
+cp agents/tester/AGENTS.md ~/.openclaw/agent-tester/
 ```
 
-编辑 `.env` 文件，填入你的 GitHub Token：
-```
-GITHUB_TOKEN=github_pat_xxx
-```
+### 2. 配置每个 Agent
 
-### 2. 构建并启动
+在每个目录创建 `openclaw.json`：
 
-```bash
-docker-compose up -d --build
-```
-
-### 3. 查看状态
-
-```bash
-# 查看容器状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f
-
-# 查看单个 Agent 日志
-docker-compose logs -f developer
-docker-compose logs -f reviewer
-docker-compose logs -f tester
+```json
+{
+  "agent": {
+    "model": "bailian/qwen3.5-plus"
+  },
+  "gateway": {
+    "bind": "127.0.0.1",
+    "port": 18791
+  }
+}
 ```
 
-### 4. 访问 Agent
+**注意：** 每个 Agent 使用不同端口：
+- Developer: 18791
+- Reviewer: 18792
+- Tester: 18793
 
-每个 Agent 运行独立的 OpenClaw Gateway：
+### 3. 启动 3 个 Gateway
 
-| Agent | 端口 | 说明 |
-|-------|------|------|
-| Developer | 18791 | 开发者 Agent |
-| Reviewer | 18792 | 审查者 Agent |
-| Tester | 18793 | 测试者 Agent |
+```powershell
+# Terminal 1 - Developer
+cd ~/.openclaw/agent-developer
+openclaw gateway --port 18791
 
-测试连接：
-```bash
-curl http://localhost:18791/health
-curl http://localhost:18792/health
-curl http://localhost:18793/health
+# Terminal 2 - Reviewer
+cd ~/.openclaw/agent-reviewer
+openclaw gateway --port 18792
+
+# Terminal 3 - Tester
+cd ~/.openclaw/agent-tester
+openclaw gateway --port 18793
 ```
 
-### 5. 停止
+### 4. 与 Agent 对话
 
-```bash
-docker-compose down
-```
+使用飞书或其他方式连接到不同端口的 Gateway。
 
-## 与 Agent 交互
+---
 
-### 方式一：直接访问 Gateway
+## Docker 方案（高级用户）
 
-每个 Agent 的 Gateway 可以通过 HTTP 访问，但需要配置通信渠道（Telegram/飞书等）。
+如果你坚持使用 Docker，需要：
 
-### 方式二：通过 GitHub
+1. 克隆 OpenClaw 主仓库
+2. 运行 `./docker-setup.sh` 构建镜像
+3. 修改 docker-compose.yml 使用本地镜像
 
-Agent 会：
-1. 从 GitHub 拉取项目代码
-2. 执行任务
-3. 提交代码/PR 到 GitHub
-
-你可以通过 GitHub 跟踪进度。
-
-### 方式三：本地 OpenClaw
-
-你可以用本地 OpenClaw 与各个 Agent 通信：
-
-```bash
-# 与 Developer 对话
-openclaw agent --message "开始开发" --gateway http://localhost:18791
-
-# 与 Reviewer 对话
-openclaw agent --message "审查代码" --gateway http://localhost:18792
-```
-
-## 故障排查
-
-**容器无法启动：**
-```bash
-docker-compose logs
-```
-
-**GitHub 拉取失败：**
-- 检查 `.env` 文件中的 GITHUB_TOKEN
-- 确认 Token 有 repo 权限
-
-**Agent 无响应：**
-```bash
-docker-compose restart developer
-curl http://localhost:18791/health
-```
-
-## 工作流程
-
-```
-1. 你在 GitHub 创建 Issue 分配任务
-2. Developer 拉取代码 → 开发 → 提交 PR
-3. Reviewer 审查 PR → 提出意见
-4. Developer 修改 → 再次提交
-5. Tester 测试 → 报告问题
-6. 合并到 main 分支
-```
-
-## 下一步
-
-项目初步完成后，实现 Mailbox 通信系统，让 Agent 可以直接通信。
+参考：https://docs.openclaw.ai/install/docker

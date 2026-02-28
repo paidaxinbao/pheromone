@@ -1,58 +1,64 @@
-# Agent Swarm - 3 个 OpenClaw Agent 容器
-# 初始阶段：Agent 之间通过 GitHub 协作
+# Agent Swarm - OpenClaw Docker 部署
+# 参考：https://docs.openclaw.ai/install/docker
 
 services:
   # Developer Agent
   developer:
+    image: openclaw:local
     build:
-      context: ..
-      dockerfile: docker/agent-developer/Dockerfile
+      context: ../../
+      dockerfile: ../../Dockerfile
     container_name: agent-swarm-developer
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - OPENCLAW_MODEL=bailian/qwen3.5-plus
     volumes:
-      - developer-workspace:/root/.openclaw/workspace
+      - ./data/developer:/home/node/.openclaw
+      - ../:/home/node/workspace:ro
     networks:
       - agent-network
     ports:
-      - "18791:18791"
+      - "18791:18789"
+    working_dir: /home/node/workspace
+    command: ["gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
     restart: unless-stopped
 
   # Reviewer Agent
   reviewer:
-    build:
-      context: ..
-      dockerfile: docker/agent-reviewer/Dockerfile
+    image: openclaw:local
     container_name: agent-swarm-reviewer
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - OPENCLAW_MODEL=bailian/qwen3.5-plus
     volumes:
-      - reviewer-workspace:/root/.openclaw/workspace
+      - ./data/reviewer:/home/node/.openclaw
+      - ../:/home/node/workspace:ro
     networks:
       - agent-network
     ports:
-      - "18792:18792"
+      - "18792:18789"
+    working_dir: /home/node/workspace
+    command: ["gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
     depends_on:
       - developer
     restart: unless-stopped
 
   # Tester Agent
   tester:
-    build:
-      context: ..
-      dockerfile: docker/agent-tester/Dockerfile
+    image: openclaw:local
     container_name: agent-swarm-tester
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - OPENCLAW_MODEL=bailian/qwen3.5-plus
     volumes:
-      - tester-workspace:/root/.openclaw/workspace
+      - ./data/tester:/home/node/.openclaw
+      - ../:/home/node/workspace:ro
     networks:
       - agent-network
     ports:
-      - "18793:18793"
+      - "18793:18789"
+    working_dir: /home/node/workspace
+    command: ["gateway", "--port", "18789", "--verbose", "--allow-unconfigured"]
     depends_on:
       - reviewer
     restart: unless-stopped
@@ -60,8 +66,3 @@ services:
 networks:
   agent-network:
     driver: bridge
-
-volumes:
-  developer-workspace:
-  reviewer-workspace:
-  tester-workspace:
