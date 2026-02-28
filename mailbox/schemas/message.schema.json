@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-swarm.local/schemas/message.schema.json",
+  "title": "Message Payloads",
+  "description": "各类消息的 payload 结构定义",
+
+  "definitions": {
+    "TaskAssignPayload": {
+      "type": "object",
+      "required": ["task"],
+      "properties": {
+        "task": { "$ref": "./task.schema.json" },
+        "instructions": {
+          "type": "string",
+          "description": "额外的执行指令"
+        },
+        "context": {
+          "type": "object",
+          "description": "执行上下文数据"
+        }
+      }
+    },
+
+    "TaskUpdatePayload": {
+      "type": "object",
+      "required": ["taskId", "status"],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "pattern": "^task-[a-z0-9-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["in_progress", "blocked", "review"]
+        },
+        "progress": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "message": {
+          "type": "string",
+          "description": "状态更新说明"
+        },
+        "blocker": {
+          "type": "object",
+          "properties": {
+            "reason": { "type": "string" },
+            "waitingFor": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "TaskCompletePayload": {
+      "type": "object",
+      "required": ["taskId"],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "pattern": "^task-[a-z0-9-]+$"
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "output": { "type": "string" },
+            "artifacts": { "type": "array" }
+          }
+        },
+        "summary": {
+          "type": "string",
+          "description": "完成摘要"
+        }
+      }
+    },
+
+    "TaskFailPayload": {
+      "type": "object",
+      "required": ["taskId", "error"],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "pattern": "^task-[a-z0-9-]+$"
+        },
+        "error": {
+          "type": "object",
+          "required": ["message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" },
+            "details": { "type": "object" },
+            "retryable": { "type": "boolean" }
+          }
+        },
+        "partialResult": {
+          "type": "object",
+          "description": "失败前的部分结果"
+        }
+      }
+    },
+
+    "DirectMessagePayload": {
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "消息内容"
+        },
+        "contentType": {
+          "type": "string",
+          "enum": ["text", "markdown", "code", "json"],
+          "default": "text"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "type": { "type": "string" },
+              "url": { "type": "string" },
+              "data": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "BroadcastPayload": {
+      "type": "object",
+      "required": ["subject", "content"],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "广播主题"
+        },
+        "content": {
+          "type": "string"
+        },
+        "contentType": {
+          "type": "string",
+          "enum": ["text", "markdown", "json"],
+          "default": "text"
+        },
+        "urgent": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+
+    "HeartbeatPayload": {
+      "type": "object",
+      "required": ["agentId", "status"],
+      "properties": {
+        "agentId": {
+          "type": "string",
+          "pattern": "^agent-[a-z0-9-]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["idle", "busy", "offline", "error"]
+        },
+        "currentTask": {
+          "type": "string",
+          "pattern": "^task-[a-z0-9-]+$"
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "number" },
+            "memory": { "type": "number" },
+            "queueSize": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "StatusSyncPayload": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": { "$ref": "./agent.schema.json" }
+        },
+        "tasks": {
+          "type": "array",
+          "items": { "$ref": "./task.schema.json" }
+        },
+        "syncToken": {
+          "type": "string",
+          "description": "同步令牌，用于增量同步"
+        }
+      }
+    },
+
+    "HandshakeRegisterPayload": {
+      "type": "object",
+      "required": ["agent"],
+      "properties": {
+        "agent": { "$ref": "./agent.schema.json" },
+        "token": {
+          "type": "string",
+          "description": "认证令牌"
+        }
+      }
+    },
+
+    "HandshakeAckPayload": {
+      "type": "object",
+      "required": ["success", "agentId"],
+      "properties": {
+        "success": { "type": "boolean" },
+        "agentId": {
+          "type": "string",
+          "pattern": "^agent-[a-z0-9-]+$"
+        },
+        "message": { "type": "string" },
+        "config": {
+          "type": "object",
+          "properties": {
+            "heartbeatInterval": { "type": "integer" },
+            "messageTimeout": { "type": "integer" }
+          }
+        }
+      }
+    }
+  },
+
+  "type": "object",
+  "description": "此文件仅定义 payload 结构，由 envelope.schema.json 引用"
+}

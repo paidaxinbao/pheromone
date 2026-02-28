@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-swarm.local/schemas/envelope.schema.json",
+  "title": "Mailbox Envelope",
+  "description": "消息信封 - 所有 Mailbox 消息的外层包装",
+  "type": "object",
+  "required": ["id", "type", "version", "timestamp", "sender", "payload"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "消息唯一标识符 (UUID v4)"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^(task|message|status|handshake)\\.(assign|update|complete|fail|direct|broadcast|heartbeat|sync|register|ack)$",
+      "description": "消息类型，格式: category.action"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0",
+      "description": "协议版本号"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "消息时间戳 (ISO 8601)"
+    },
+    "sender": {
+      "$ref": "./agent.schema.json",
+      "description": "发送方信息"
+    },
+    "recipient": {
+      "oneOf": [
+        { "$ref": "./agent.schema.json" },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["all", "role", "specific"]
+            },
+            "target": {
+              "oneOf": [
+                { "type": "string", "description": "特定 Agent ID 或角色名" },
+                { "type": "array", "items": { "type": "string" } }
+              ]
+            }
+          },
+          "required": ["type"]
+        }
+      ],
+      "description": "接收方信息 (可选，广播消息时省略)"
+    },
+    "payload": {
+      "type": "object",
+      "description": "消息内容，具体结构由 type 决定"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "correlationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "关联消息 ID，用于请求-响应模式"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "normal", "high", "urgent"],
+          "default": "normal"
+        },
+        "ttl": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "消息存活时间 (秒)，0 表示永不过期"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "自定义标签"
+        }
+      },
+      "description": "消息元数据"
+    }
+  },
+  "additionalProperties": false
+}

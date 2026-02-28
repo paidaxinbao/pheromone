@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-swarm.local/schemas/task.schema.json",
+  "title": "Task",
+  "description": "任务结构定义",
+  "type": "object",
+  "required": ["id", "type", "title", "status", "createdAt"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^task-[a-z0-9-]+$",
+      "description": "任务唯一标识符"
+    },
+    "parentId": {
+      "type": "string",
+      "pattern": "^task-[a-z0-9-]+$",
+      "description": "父任务 ID (用于子任务)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "feature",
+        "bugfix",
+        "refactor",
+        "test",
+        "review",
+        "docs",
+        "deploy",
+        "research"
+      ],
+      "description": "任务类型"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "任务标题"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 8192,
+      "description": "任务详细描述"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "assigned",
+        "in_progress",
+        "blocked",
+        "review",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "default": "pending",
+      "description": "任务状态"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "normal", "high", "critical"],
+      "default": "normal",
+      "description": "任务优先级"
+    },
+    "assignee": {
+      "type": "string",
+      "pattern": "^agent-[a-z0-9-]+$",
+      "description": "分配的 Agent ID"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^task-[a-z0-9-]+$"
+      },
+      "description": "依赖任务 ID 列表"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "任务标签"
+    },
+    "estimatedMinutes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "预估耗时 (分钟)"
+    },
+    "progress": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "完成进度 (0-100)"
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "output": { "type": "string" },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "path": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        }
+      },
+      "description": "任务结果"
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": "object" },
+        "retryable": { "type": "boolean", "default": false }
+      },
+      "description": "错误信息"
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "assignedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["createdAt"]
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "branch": { "type": "string" },
+        "commit": { "type": "string" },
+        "environment": { "type": "string" }
+      },
+      "description": "任务上下文"
+    }
+  },
+  "additionalProperties": true
+}

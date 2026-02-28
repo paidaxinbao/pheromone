@@ -36,7 +36,13 @@ const MESSAGE_TYPES = {
   // 状态相关
   STATUS_REPORT: 'status_report',       // 状态报告
   HEARTBEAT: 'heartbeat',               // 心跳
-  ERROR: 'error'                        // 错误报告
+  ERROR: 'error',                       // 错误报告
+  
+  // 确认相关 (新增)
+  ACK: 'ack',                           // 消息确认
+  NACK: 'nack',                         // 消息拒绝
+  PING: 'ping',                         // 连接检测
+  PONG: 'pong'                          // 连接响应
 };
 
 const AGENT_ROLES = {

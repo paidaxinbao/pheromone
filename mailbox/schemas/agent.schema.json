@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-swarm.local/schemas/agent.schema.json",
+  "title": "Agent Info",
+  "description": "Agent 身份信息",
+  "type": "object",
+  "required": ["id", "role"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^agent-[a-z0-9-]+$",
+      "description": "Agent 唯一标识符"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["manager", "developer", "reviewer", "tester", "coordinator"],
+      "description": "Agent 角色"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "Agent 显示名称"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "code.read",
+          "code.write",
+          "code.execute",
+          "git.read",
+          "git.write",
+          "file.read",
+          "file.write",
+          "test.run",
+          "test.write",
+          "review.code",
+          "deploy"
+        ]
+      },
+      "description": "Agent 能力列表"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["idle", "busy", "offline", "error"],
+      "default": "idle",
+      "description": "Agent 当前状态"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" },
+        "model": { "type": "string" },
+        "endpoint": { "type": "string", "format": "uri" }
+      },
+      "description": "Agent 扩展信息"
+    }
+  },
+  "additionalProperties": true
+}
