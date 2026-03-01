@@ -1,9 +1,0 @@
-{
-  "id": "task-invalid-001",
-  "type": "feature",
-  "title": "Invalid task status",
-  "status": "unknown_status",
-  "timestamps": {
-    "createdAt": "2026-03-01T01:00:00.000Z"
-  }
-}

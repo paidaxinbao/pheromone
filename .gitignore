@@ -1,5 +1,20 @@
 # Dependencies
 node_modules/
+package-lock.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
 
 # Build output
 dist/
@@ -10,24 +25,26 @@ build/
 .env.local
 .env.*.local
 
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# OS
-.DS_Store
-Thumbs.db
-
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Test coverage
-coverage/
+# OS
+.DS_Store
+Thumbs.db
 
 # Temporary files
 tmp/
 temp/
+*.tmp
+
+# Data (for development)
+data/
+!data/.gitkeep
+
+# Test artifacts
+*.test.js
+test-results/
