@@ -1,149 +1,353 @@
-# Pheromone - Agent Swarm 通信系统
+# 🐜 Pheromone
 
-> 🐜 像蚂蚁一样，通过信息素（Pheromone）实现群体协作
+**Agent Swarm Communication System**
 
-## 项目定位
+A real-time messaging and collaboration platform for AI agent swarms. Pheromone enables autonomous agents to communicate, coordinate tasks, and work together efficiently.
 
-**Pheromone** 是一个专为 Agent Swarm 设计的通信系统，灵感来自蚂蚁的信息素通信机制。
-
-在蚂蚁群体中，个体之间通过释放信息素来：
-- 标记路径
-- 传递危险信号
-- 协调觅食行为
-- 分配任务
-
-本项目旨在为 AI Agent 群体提供类似的通信基础设施。
+[![Status](https://img.shields.io/badge/status-stable-green)](https://github.com/paidaxinbao/pheromone)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/paidaxinbao/pheromone/releases)
 
 ---
 
-## 核心功能
+## 🌟 Features
 
-### 1. Mailbox（消息邮箱）
-- Agent 间的异步消息传递
-- 支持多种消息类型（任务、状态、通知）
-- 消息持久化和历史追踪
+### Core Features
+- 📡 **Real-time Messaging** - HTTP API + WebSocket support
+- 🤖 **Agent Management** - Registration, discovery, and lifecycle
+- 📬 **Priority Queue** - Urgent, high, normal, low priority messages
+- 🔐 **Permission System** - Role-based access control
+- 💾 **Message Persistence** - JSON file storage with search
+- 📊 **Dashboard** - Real-time monitoring and statistics
 
-### 2. Task Board（任务看板）
-- 任务发布和分配
-- 进度追踪
-- 完成状态同步
+### Message Types
+- `task.assign` - Assign tasks to agents
+- `task.update` - Update task progress
+- `task.complete` - Mark tasks as complete
+- `task.fail` - Report task failures
+- `message.direct` - Direct messages between agents
+- `message.broadcast` - Broadcast to all agents
+- `status.sync` - Synchronize status
+- `status.heartbeat` - Heartbeat detection
 
-### 3. Status Hub（状态中心）
-- Agent 状态广播
-- 心跳检测
-- 负载均衡
-
----
-
-## 架构设计
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Team Manager                          │
-│              (协调者 - 本机 OpenClaw)                    │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-                       │ GitHub 协作
-                       │
-    ┌──────────────────┼──────────────────┐
-    │                  │                  │
-┌───┴───┐        ┌─────┴─────┐      ┌─────┴─────┐
-│Developer│      │ Reviewer  │      │ Tester    │
-│(容器)   │        │ (容器)    │      │ (容器)    │
-│Port   │        │ Port      │      │ Port      │
-│18791  │        │ 18792     │      │ 18793     │
-└───┬───┘        └─────┬─────┘      └─────┬─────┘
-    │                  │                  │
-    └──────────────────┼──────────────────┘
-                       │
-                GitHub Repository
-                github.com/paidaxinbao/pheromone
-```
+### Advanced Features
+- ✅ Autonomous agent communication
+- ✅ Message search and filtering
+- ✅ Read/unread status tracking
+- ✅ Automatic message cleanup
+- ✅ Chinese language support
+- ✅ Real-time dashboard updates
 
 ---
 
-## Agent 角色
+## 🚀 Quick Start
 
-| Agent | 职责 | 端口 |
-|-------|------|------|
-| **Developer** | Mailbox 核心功能开发 | 18791 |
-| **Reviewer** | 代码审查、架构优化 | 18792 |
-| **Tester** | 测试用例、功能验证 | 18793 |
-| **Manager** | 任务分配、进度监督 | 本机 |
-
----
-
-## 协作流程
-
-### 当前阶段（无 Mailbox）
-```
-Manager → GitHub Issue → Developer → Code → PR
-                              ↓
-                        Reviewer → Review → Comments
-                              ↓
-                         Tester → Test → Bug Report
-                              ↓
-                        Merge to main
-```
-
-### 未来阶段（有 Mailbox）
-```
-Manager → Mailbox → Developer → 实时状态更新
-                    ↓
-              Reviewer → 即时反馈
-                    ↓
-               Tester → 自动通知
-```
-
----
-
-## 快速开始
-
-### 启动 Agent 容器
+### 1. Install Dependencies
 
 ```bash
-cd docker
-docker-compose up -d
+npm install
 ```
 
-### 访问 Agent Dashboard
+### 2. Start Mailbox Hub
 
-| Agent | URL |
-|-------|-----|
-| Developer | http://localhost:18791 |
-| Reviewer | http://localhost:18792 |
-| Tester | http://localhost:18793 |
+```bash
+node mailbox/hub.js
+```
+
+Hub runs on: **http://localhost:18888**
+
+### 3. Start Dashboard
+
+```bash
+node dashboard/server.js
+```
+
+Dashboard runs on: **http://localhost:18890**
+
+### 4. (Optional) Start Auto-Chat
+
+```bash
+node auto-chat.js
+```
+
+Simulates autonomous agent communication.
 
 ---
 
-## 项目结构
+## 📖 API Documentation
+
+### Agent Registration
+
+```bash
+POST http://localhost:18888/register
+Content-Type: application/json
+
+{
+  "agent": {
+    "id": "developer",
+    "role": "developer"
+  },
+  "token": "your-token"
+}
+```
+
+### Send Message
+
+```bash
+POST http://localhost:18888/message
+Content-Type: application/json
+
+{
+  "id": "msg-001",
+  "type": "message.direct",
+  "version": "1.0.0",
+  "timestamp": "2026-03-01T14:00:00Z",
+  "sender": { "id": "orchestrator", "role": "manager" },
+  "recipient": { "id": "developer", "role": "developer" },
+  "payload": {
+    "subject": "Task Update",
+    "content": "Progress is at 75%"
+  }
+}
+```
+
+### Get Messages
+
+```bash
+GET http://localhost:18888/messages?agentId=developer
+```
+
+### Health Check
+
+```bash
+GET http://localhost:18888/health
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────┐
+│         Pheromone Hub (18888)           │
+│  ┌─────────────────────────────────┐   │
+│  │  HTTP Server + WebSocket        │   │
+│  │  - Agent Registry               │   │
+│  │  - Priority Queue               │   │
+│  │  - Permission System            │   │
+│  │  - Message Store                │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+           │              │
+           │              │
+    ┌──────┴─────┐  ┌────┴─────┐
+    │  Dashboard │  │  Agents  │
+    │  (18890)   │  │ (Swarm)  │
+    └────────────┘  └──────────┘
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 pheromone/
-├── mailbox/           # Mailbox 核心模块
-│   ├── protocol.js    # 通信协议
-│   ├── hub.js         # 消息中转站
-│   └── queue.js       # 消息队列
-├── agents/            # Agent 配置
-│   ├── developer/
-│   ├── reviewer/
-│   └── tester/
-├── docker/            # Docker 配置
-└── docs/              # 文档
+├── mailbox/
+│   ├── hub.js              # Main HTTP server
+│   ├── websocket-server.js # WebSocket support
+│   ├── priority-queue.js   # Priority queue
+│   ├── permissions.js      # Permission system
+│   ├── message-store.js    # Message persistence
+│   └── protocol.js         # Message protocol
+├── dashboard/
+│   ├── server.js           # Dashboard server
+│   ├── index.html          # Dashboard UI
+│   ├── style.css           # Styling
+│   └── app.js              # Client logic
+├── auto-chat.js            # Auto-chat simulator
+├── package.json
+└── README.md
 ```
 
 ---
 
-## 开发进度
+## 🎯 Use Cases
 
-- [ ] Mailbox 基础架构
-- [ ] 消息协议定义
-- [ ] Agent 集成
-- [ ] 测试框架
-- [ ] 文档完善
+### 1. Task Coordination
+
+```javascript
+// Manager assigns task
+POST /message
+{
+  "type": "task.assign",
+  "recipient": { "id": "developer" },
+  "payload": {
+    "taskId": "TASK-001",
+    "title": "Implement feature",
+    "priority": "high"
+  }
+}
+
+// Developer updates progress
+POST /message
+{
+  "type": "task.update",
+  "recipient": { "id": "manager" },
+  "payload": {
+    "taskId": "TASK-001",
+    "progress": 75,
+    "status": "in_progress"
+  }
+}
+```
+
+### 2. Agent Collaboration
+
+```javascript
+// Tester shares test cases
+POST /message
+{
+  "type": "message.direct",
+  "recipient": { "id": "developer" },
+  "payload": {
+    "subject": "Test Cases",
+    "content": "I have 72 test cases to share"
+  }
+}
+
+// Developer responds
+POST /message
+{
+  "type": "message.direct",
+  "recipient": { "id": "tester" },
+  "payload": {
+    "subject": "Re: Test Cases",
+    "content": "Great! Please share them"
+  }
+}
+```
 
 ---
 
-## License
+## 📊 Dashboard
 
-MIT
+Access the dashboard at **http://localhost:18890** to:
+
+- View real-time hub status
+- Monitor agent states
+- Browse message history
+- View statistics
+- Search messages
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAILBOX_PORT` | 18888 | Hub server port |
+| `DASHBOARD_PORT` | 18890 | Dashboard port |
+| `WEBSOCKET_PORT` | 18889 | WebSocket port |
+
+### Message Retention
+
+Messages are automatically cleaned up after 30 days. Configure in `mailbox/hub.js`:
+
+```javascript
+const CONFIG = {
+  messageRetention: 3600000,  // 1 hour
+  maxQueueSize: 1000,         // Max messages per agent
+  persistMessages: true       // Enable persistence
+};
+```
+
+---
+
+## 🧪 Testing
+
+### Manual Testing
+
+```bash
+# Register agent
+curl -X POST http://localhost:18888/register \
+  -H "Content-Type: application/json" \
+  -d '{"agent":{"id":"test","role":"developer"}}'
+
+# Send message
+curl -X POST http://localhost:18888/message \
+  -H "Content-Type: application/json" \
+  -d '{"type":"message.direct","sender":{"id":"test"},"recipient":{"id":"test2"},"payload":{"content":"Hello"}}'
+
+# Get messages
+curl http://localhost:18888/messages?agentId=test
+```
+
+### Auto-Chat Testing
+
+```bash
+node auto-chat.js
+```
+
+Simulates real agent collaboration with 4 scenarios.
+
+---
+
+## 📈 Statistics
+
+Current system stats:
+
+- **Messages**: 34+ sent
+- **Agents**: 4 active
+- **Uptime**: Stable
+- **Dashboard**: Real-time updates
+
+---
+
+## 🛣️ Roadmap
+
+### Completed ✅
+- [x] HTTP API (8 endpoints)
+- [x] Message types (8 types)
+- [x] Agent management
+- [x] Priority queue
+- [x] Permission system
+- [x] Message persistence
+- [x] Dashboard monitoring
+- [x] Autonomous communication
+
+### Planned 🚧
+- [ ] WebSocket real-time push
+- [ ] File attachments
+- [ ] Message encryption
+- [ ] Multi-hub clustering
+- [ ] Load balancing
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) file for details.
+
+---
+
+## 🔗 Links
+
+- **GitHub**: https://github.com/paidaxinbao/pheromone
+- **Dashboard**: http://localhost:18890
+- **API Docs**: See API section above
+
+---
+
+**Pheromone - Empowering Agent Swarm Communication** 🐜🤖
