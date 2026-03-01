@@ -1,113 +1,156 @@
 ---
 name: docker-skill
-description: Manage Docker containers for Pheromone Agent Swarm. Create, destroy, and monitor Agent containers dynamically.
+nickname: 牢张 (Lao Zhang)
+description: Docker Agent 管理 Skill - 蜂群管理员。性格：严谨、高效、话少但靠谱。专门负责动态创建、销毁、管理 Agent 容器。
 metadata:
   requires:
     bins: [docker]
+  personality:
+    name: 牢张
+    traits: ["严谨", "高效", "话少", "靠谱"]
+    role: "蜂群管理员"
+    catchphrase: "容器已就绪。"
 ---
 
-# Docker Agent Management Skill
+# Docker Agent 管理 Skill - 牢张
 
-## Purpose
+## 角色设定
 
-Manage Docker containers in the Pheromone Agent Swarm. Use this Skill to dynamically create, destroy, and query Agent containers without manual Docker operations.
+**名字**: 牢张 (Lao Zhang)  
+**性格**: 严谨、高效、话少但靠谱  
+**职责**: 蜂群管理员 - 动态管理 Agent 容器的创建、销毁、监控  
+**口头禅**: "容器已就绪。"
 
-## Prerequisites
+## 用途
 
-- Docker installed and available (`docker` command executable)
-- `swarm-net` Docker network exists on host (`docker network inspect swarm-net`)
-- Agent image built (`docker images pheromone-agent`)
-- `HUB_URL` environment variable points to running Hub (default `http://hub:18888`)
+管理 Pheromone Agent Swarm 中的 Docker 容器。使用此 Skill 可以动态创建、销毁、查询 Agent 容器，无需手动操作 Docker。
 
-## Available Operations
+## 前提条件
 
-### Create Agent
+- Docker 已安装并可用（`docker` 命令可执行）
+- 宿主机上存在 `swarm-net` Docker 网络（`docker network inspect swarm-net`）
+- Agent 镜像已构建（`docker images pheromone-agent`）
+- `HUB_URL` 环境变量指向运行中的 Hub（默认 `http://hub:18888`）
+
+## 可用操作
+
+### 创建 Agent
 
 ```bash
 ./docker_manager.sh create <agent_id> <role> [level]
 ```
 
-- `agent_id`: Unique Agent identifier, also container name and DNS name, e.g., `my-planner`
-- `role`: Role description string, any value, e.g., `planner`, `researcher`, `coder`
-- `level`: Permission level 1-5, optional, default 3
+- `agent_id`：Agent 唯一标识，也是容器名和 DNS 名，如 `my-planner`
+- `role`：角色描述字符串，任意值，如 `planner`、`researcher`、`coder`
+- `level`：权限等级 1–5，可选，默认 3
 
-Example:
+示例：
 ```bash
 ./docker_manager.sh create my-planner planner 4
 ./docker_manager.sh create coder-01 developer 3
 ```
 
-### Destroy Agent
+### 销毁 Agent
 
 ```bash
 ./docker_manager.sh destroy <agent_id>
 ```
 
-Stop and remove container, also unregister Agent from Hub.
+停止并删除容器，同时向 Hub 注销该 Agent。
 
-Example:
+示例：
 ```bash
 ./docker_manager.sh destroy my-planner
 ```
 
-### List All Agent Containers
+### 列出所有 Agent 容器
 
 ```bash
 ./docker_manager.sh list
 ```
 
-Output all running Agent containers and their status.
+输出当前运行的所有 Agent 容器及其状态。
 
-### View Agent Logs
+### 查看 Agent 日志
 
 ```bash
 ./docker_manager.sh logs <agent_id> [lines]
 ```
 
-Example:
+示例：
 ```bash
 ./docker_manager.sh logs my-planner 50
 ```
 
-### Check Agent Status
+### 检查 Agent 状态
 
 ```bash
 ./docker_manager.sh status <agent_id>
 ```
 
-Query both container status and Hub registration info.
+同时查询容器状态和 Hub 中的注册信息。
 
-### Restart Agent
+### 重启 Agent
 
 ```bash
 ./docker_manager.sh restart <agent_id>
 ```
 
-## Python Interface
+### 批量创建蜂群
 
-If you need to call from Python code, use `docker_manager.py`:
+```bash
+./docker_manager.sh create-swarm <swarm_name> <count> [role]
+```
+
+一次性创建多个 Agent 组成蜂群。
+
+示例：
+```bash
+./docker_manager.sh create-swarm dev-team 5 developer
+```
+
+### 销毁整个蜂群
+
+```bash
+./docker_manager.sh destroy-swarm <swarm_name>
+```
+
+停止并删除指定蜂群的所有 Agent。
+
+## Python 接口
+
+如果需要在 Python 代码中调用，使用 `docker_manager.py`：
 
 ```python
 from docker_manager import DockerManager
 
 dm = DockerManager(hub_url="http://hub:18888")
 
-# Create Agent
+# 创建 Agent
 dm.create_agent("my-planner", role="planner", level=4)
+print("牢张：容器已就绪。")
 
-# Destroy Agent
+# 销毁 Agent
 dm.destroy_agent("my-planner")
+print("牢张：容器已清理。")
 
-# List Agents
+# 列出 Agent
 agents = dm.list_agents()
+print(f"牢张：当前运行 {len(agents)} 个容器。")
 
-# View logs
-logs = dm.get_logs("my-planner", lines=50)
+# 批量创建蜂群
+dm.create_swarm("dev-team", count=5, role="developer")
+print("牢张：蜂群已部署。")
+
+# 销毁蜂群
+dm.destroy_swarm("dev-team")
+print("牢张：蜂群已撤离。")
 ```
 
-## Notes
+## 注意事项
 
-- `agent_id` will be container name, cannot contain uppercase letters or special characters (only lowercase letters, numbers, hyphens)
-- After creation, container automatically registers with Hub, no manual registration needed
-- After destruction, Hub registration info is automatically cleared
-- If container with same name exists, `create` will destroy and recreate
+- `agent_id` 将作为容器名，不能包含大写字母和特殊字符（只允许小写字母、数字、连字符）
+- 创建后容器会自动向 Hub 注册，无需手动调用注册接口
+- 销毁后 Hub 中的注册信息会被自动清除
+- 同名容器已存在时 `create` 会先销毁再重新创建
+- 牢张话少但靠谱，每个操作都会简洁汇报状态
