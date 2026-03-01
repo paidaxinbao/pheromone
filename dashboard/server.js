@@ -1,5 +1,5 @@
 /**
- * Pheromone Dashboard Server
+ * Pheromone Dashboard Server v2
  * Real-time monitoring dashboard for Agent Swarm
  */
 
@@ -12,7 +12,7 @@ const CONFIG = {
   mailboxUrl: 'http://localhost:18888'
 };
 
-// Simple in-memory cache
+// Cache
 let cache = {
   agents: [],
   stats: null,
@@ -23,7 +23,7 @@ let cache = {
 async function fetchFromMailbox(endpoint) {
   try {
     const url = `${CONFIG.mailboxUrl}${endpoint}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { timeout: 5000 });
     return await res.json();
   } catch (err) {
     console.error(`Error fetching ${endpoint}:`, err.message);
@@ -33,7 +33,9 @@ async function fetchFromMailbox(endpoint) {
 
 async function updateCache() {
   const now = Date.now();
-  if (now - cache.lastUpdate < 5000) return; // Cache for 5 seconds
+  if (now - cache.lastUpdate < 5000) return;
+  
+  console.log('Updating dashboard cache...');
   
   const [agentsRes, statsRes] = await Promise.all([
     fetchFromMailbox('/agents'),
@@ -42,14 +44,28 @@ async function updateCache() {
   
   if (agentsRes?.success) {
     cache.agents = agentsRes.agents || [];
+    console.log(`  Agents: ${cache.agents.length}`);
   }
   
   if (statsRes?.success) {
     cache.stats = statsRes.stats;
   }
   
+  // Fetch messages from all agents
+  cache.messages = [];
+  if (agentsRes?.success && agentsRes.agents) {
+    for (const agent of agentsRes.agents) {
+      const msgRes = await fetchFromMailbox(`/messages?agentId=${agent.id}`);
+      if (msgRes?.success && msgRes.messages) {
+        cache.messages.push(...msgRes.messages);
+      }
+    }
+    // Sort by newest first
+    cache.messages.sort((a, b) => (b._enqueuedAt || 0) - (a._enqueuedAt || 0));
+    console.log(`  Messages: ${cache.messages.length}`);
+  }
+  
   cache.lastUpdate = now;
-  console.log(`Dashboard cache updated: ${cache.agents.length} agents`);
 }
 
 function serveFile(res, filePath, contentType) {
@@ -99,6 +115,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   
+  if (url.pathname === '/api/messages') {
+    await updateCache();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, messages: cache.messages }));
+    return;
+  }
+  
   // Serve static files
   if (url.pathname === '/' || url.pathname === '/index.html') {
     serveFile(res, path.join(__dirname, 'index.html'), 'text/html');
@@ -121,7 +144,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(CONFIG.port, () => {
   console.log(`╔════════════════════════════════════════╗`);
-  console.log(`║   Pheromone Dashboard                  ║`);
+  console.log(`║   Pheromone Dashboard v2               ║`);
   console.log(`║   http://localhost:${CONFIG.port}            ║`);
   console.log(`║   Mailbox: ${CONFIG.mailboxUrl}       ║`);
   console.log(`╚════════════════════════════════════════╝`);
@@ -129,3 +152,6 @@ server.listen(CONFIG.port, () => {
 
 // Update cache every 10 seconds
 setInterval(updateCache, 10000);
+
+// Initial cache update
+updateCache();

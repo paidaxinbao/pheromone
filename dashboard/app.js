@@ -1,11 +1,9 @@
 /**
- * Pheromone Dashboard - Client Application
+ * Pheromone Dashboard - Client Application v2
  */
 
 const API_BASE = '';
-
-// Update interval (10 seconds)
-const UPDATE_INTERVAL = 10000;
+const UPDATE_INTERVAL = 10000; // 10 seconds
 
 // Format uptime
 function formatUptime(seconds) {
@@ -17,8 +15,9 @@ function formatUptime(seconds) {
 
 // Format timestamp
 function formatTime(isoString) {
+  if (!isoString) return '-';
   const date = new Date(isoString);
-  return date.toLocaleTimeString();
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 // Get role color
@@ -62,7 +61,7 @@ function renderAgents(agents) {
         </div>
         <div class="info-row">
           <span class="label">Last Heartbeat</span>
-          <span class="value">${formatTime(agent.lastHeartbeat)}</span>
+          <span class="value">${formatTime(new Date(agent.lastHeartbeat).toISOString())}</span>
         </div>
         ${agent.currentTask ? `
         <div class="info-row">
@@ -90,30 +89,38 @@ function renderStats(stats) {
   document.getElementById('stat-messages-by-role').textContent = roleText || '-';
 }
 
-// Render messages (placeholder - would need message history API)
+// Render messages
 function renderMessages(messages) {
   const log = document.getElementById('message-log');
   
   if (!messages || messages.length === 0) {
-    log.innerHTML = '<p class="empty">No messages yet. Messages will appear here when agents communicate.</p>';
+    log.innerHTML = '<p class="empty">💬 No messages yet. Messages will appear here when agents communicate.</p>';
     return;
   }
   
-  log.innerHTML = messages.map(msg => `
-    <div class="message-item">
-      <div class="message-header">
-        <span class="message-type">${msg.type}</span>
-        <span class="message-time">${formatTime(msg.timestamp)}</span>
+  log.innerHTML = messages.map(msg => {
+    const payloadText = msg.payload?.title || 
+                       msg.payload?.subject || 
+                       msg.payload?.content || 
+                       msg.payload?.taskId ||
+                       JSON.stringify(msg.payload);
+    
+    return `
+      <div class="message-item">
+        <div class="message-header">
+          <span class="message-type">${msg.type}</span>
+          <span class="message-time">${formatTime(msg.timestamp)}</span>
+        </div>
+        <div class="message-body">
+          ${payloadText}
+        </div>
+        <div class="message-sender">
+          From: ${msg.sender?.id} (${msg.sender?.role}) → 
+          To: ${msg.recipient?.id || 'broadcast'} (${msg.recipient?.role || 'all'})
+        </div>
       </div>
-      <div class="message-body">
-        ${msg.payload?.title || msg.payload?.subject || JSON.stringify(msg.payload)}
-      </div>
-      <div class="message-sender">
-        From: ${msg.sender?.id} (${msg.sender?.role}) → 
-        To: ${msg.recipient?.id || 'broadcast'} (${msg.recipient?.role || 'all'})
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // Update hub health
@@ -168,11 +175,25 @@ async function updateStats() {
   }
 }
 
+// Update messages
+async function updateMessages() {
+  try {
+    const res = await fetch(`${API_BASE}/api/messages`);
+    const data = await res.json();
+    
+    if (data.success) {
+      renderMessages(data.messages);
+    }
+  } catch (err) {
+    console.error('Failed to update messages:', err);
+  }
+}
+
 // Update last update time
 function updateLastUpdate() {
   const now = new Date();
   document.getElementById('last-update').textContent = 
-    `Last update: ${now.toLocaleTimeString()}`;
+    `Last update: ${now.toLocaleTimeString('zh-CN')}`;
 }
 
 // Main update function
@@ -180,14 +201,15 @@ async function updateDashboard() {
   await Promise.all([
     updateHubHealth(),
     updateAgents(),
-    updateStats()
+    updateStats(),
+    updateMessages()
   ]);
   updateLastUpdate();
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('Pheromone Dashboard initialized');
+  console.log('🐜 Pheromone Dashboard v2 initialized');
   
   // Initial update
   updateDashboard();
