@@ -15,6 +15,7 @@
 const http = require('http');
 const url = require('url');
 const crypto = require('crypto');
+const { MessageStore } = require('./message-store');
 
 // ============================================================================
 // Configuration
@@ -27,7 +28,11 @@ const CONFIG = {
   heartbeatTimeout: 90000,       // 90 seconds = offline
   messageRetention: 3600000,     // 1 hour
   maxQueueSize: 1000,            // Max messages per agent
+  persistMessages: true,         // Enable message persistence
 };
+
+// Initialize message store
+const messageStore = CONFIG.persistMessages ? new MessageStore() : null;
 
 // ============================================================================
 // Logger
