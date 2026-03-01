@@ -1,0 +1,128 @@
+version: "3.8"
+
+services:
+  # ============================================================================
+  # Pheromone Hub
+  # ============================================================================
+  hub:
+    build:
+      context: .
+      dockerfile: Dockerfile.hub
+    container_name: pheromone-hub
+    ports:
+      - "18888:18888"
+    volumes:
+      - hub-data:/app/data
+    networks:
+      - swarm-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # Dashboard
+  # ============================================================================
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: pheromone-dashboard
+    ports:
+      - "18890:18890"
+    environment:
+      DASHBOARD_PORT: "18890"
+      MAILBOX_URL: "http://hub:18888"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Orchestrator Agent (Manager)
+  # ============================================================================
+  orchestrator:
+    build:
+      context: ./agent-runtime
+    container_name: orchestrator
+    environment:
+      AGENT_ID: orchestrator
+      AGENT_ROLE: manager
+      HUB_URL: http://hub:18888
+      CALLBACK_PORT: "9000"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Developer Agent
+  # ============================================================================
+  developer:
+    build:
+      context: ./agent-runtime
+    container_name: developer
+    environment:
+      AGENT_ID: developer
+      AGENT_ROLE: developer
+      HUB_URL: http://hub:18888
+      CALLBACK_PORT: "9000"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Reviewer Agent
+  # ============================================================================
+  reviewer:
+    build:
+      context: ./agent-runtime
+    container_name: reviewer
+    environment:
+      AGENT_ID: reviewer
+      AGENT_ROLE: reviewer
+      HUB_URL: http://hub:18888
+      CALLBACK_PORT: "9000"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Tester Agent
+  # ============================================================================
+  tester:
+    build:
+      context: ./agent-runtime
+    container_name: tester
+    environment:
+      AGENT_ID: tester
+      AGENT_ROLE: tester
+      HUB_URL: http://hub:18888
+      CALLBACK_PORT: "9000"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
+# ==============================================================================
+# Volumes
+# ==============================================================================
+volumes:
+  hub-data:
+    driver: local
+
+# ==============================================================================
+# Networks
+# ==============================================================================
+networks:
+  swarm-net:
+    driver: bridge
