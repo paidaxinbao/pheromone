@@ -1,0 +1,26 @@
+{
+  "agent": {
+    "model": "bailian/glm-5"
+  },
+  "skills": {
+    "allowlist": [
+      "docker-skill",
+      "supervisor-skill"
+    ],
+    "paths": [
+      "./skills/docker-skill",
+      "./skills/supervisor-skill"
+    ]
+  },
+  "gateway": {
+    "bind": "0.0.0.0",
+    "port": 18789,
+    "mode": "local"
+  },
+  "tools": {
+    "exec": {
+      "host": "local",
+      "security": "allowlist"
+    }
+  }
+}

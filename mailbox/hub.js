@@ -1,21 +1,22 @@
 /**
- * Mailbox Hub - Message Communication Center
+ * Mailbox Hub v2 - Webhook Callback Mode
  * 
  * Features:
  * - HTTP Server (port 18888)
+ * - Callback Dispatcher with retry logic
  * - Message Queue Management
- * - Agent Registration & Discovery
- * - Message Routing
- * - Heartbeat Detection
+ * - Agent Registration with callbackUrl
+ * - Message Routing via Webhook
+ * - Message Persistence
  * 
- * @version 1.0.0
- * @author Agent Swarm Team
+ * @version 2.0.0
  */
 
 const http = require('http');
 const url = require('url');
 const crypto = require('crypto');
 const { MessageStore } = require('./message-store');
+const { CallbackDispatcher } = require('./callback-dispatcher');
 
 // ============================================================================
 // Configuration
@@ -24,14 +25,16 @@ const { MessageStore } = require('./message-store');
 const CONFIG = {
   port: process.env.MAILBOX_PORT || 18888,
   host: process.env.MAILBOX_HOST || '0.0.0.0',
-  heartbeatInterval: 30000,      // 30 seconds
-  heartbeatTimeout: 90000,       // 90 seconds = offline
-  messageRetention: 3600000,     // 1 hour
-  maxQueueSize: 1000,            // Max messages per agent
-  persistMessages: true,         // Enable message persistence
+  heartbeatInterval: 30000,
+  heartbeatTimeout: 90000,
+  messageRetention: 3600000,
+  maxQueueSize: 1000,
+  persistMessages: true,
+  callbackTimeout: 10000,
+  maxRetries: 3,
 };
 
-// Initialize message store
+// Initialize stores
 const messageStore = CONFIG.persistMessages ? new MessageStore() : null;
 
 // ============================================================================
@@ -45,33 +48,32 @@ const logger = {
 };
 
 // ============================================================================
-// Agent Registry
+// Agent Registry (with callbackUrl support)
 // ============================================================================
 
 class AgentRegistry {
   constructor() {
-    this.agents = new Map();        // agentId -> AgentInfo
-    this.byRole = new Map();        // role -> Set<agentId>
+    this.agents = new Map();
+    this.byRole = new Map();
   }
 
   register(agentInfo) {
-    const { id, role } = agentInfo;
+    const { id, role, callbackUrl } = agentInfo;
     
     if (!id || !role) {
       throw new Error('Agent id and role are required');
     }
     
-    // Remove old role index if exists
     if (this.agents.has(id)) {
       const oldAgent = this.agents.get(id);
       this.byRole.get(oldAgent.role)?.delete(id);
     }
     
-    // Store agent info
     const agent = {
       ...agentInfo,
       id,
       role,
+      callbackUrl: callbackUrl || null,
       registeredAt: new Date().toISOString(),
       lastHeartbeat: Date.now(),
       status: agentInfo.status || 'idle'
@@ -79,13 +81,12 @@ class AgentRegistry {
     
     this.agents.set(id, agent);
     
-    // Update role index
     if (!this.byRole.has(role)) {
       this.byRole.set(role, new Set());
     }
     this.byRole.get(role).add(id);
     
-    logger.info(`Agent registered: ${id} (role: ${role})`);
+    logger.info(`Agent registered: ${id} (role: ${role}, callback: ${callbackUrl || 'none'})`);
     return agent;
   }
 
@@ -104,48 +105,29 @@ class AgentRegistry {
     return this.agents.get(agentId);
   }
 
-  getByRole(role) {
-    const ids = this.byRole.get(role);
-    if (!ids) return [];
-    return Array.from(ids).map(id => this.agents.get(id)).filter(Boolean);
-  }
-
   getAll() {
     return Array.from(this.agents.values());
+  }
+
+  getByRole(role) {
+    const agentIds = this.byRole.get(role);
+    if (!agentIds) return [];
+    return Array.from(agentIds).map(id => this.agents.get(id));
   }
 
   updateHeartbeat(agentId) {
     const agent = this.agents.get(agentId);
     if (agent) {
       agent.lastHeartbeat = Date.now();
-      return true;
+      agent.status = 'online';
     }
-    return false;
   }
 
   updateStatus(agentId, status) {
     const agent = this.agents.get(agentId);
     if (agent) {
       agent.status = status;
-      logger.debug(`Agent ${agentId} status: ${status}`);
-      return true;
     }
-    return false;
-  }
-
-  checkTimeouts(timeoutMs) {
-    const now = Date.now();
-    const timedOut = [];
-    
-    for (const [id, agent] of this.agents) {
-      if (now - agent.lastHeartbeat > timeoutMs && agent.status !== 'offline') {
-        agent.status = 'offline';
-        timedOut.push(id);
-        logger.info(`Agent timed out: ${id}`);
-      }
-    }
-    
-    return timedOut;
   }
 
   count() {
@@ -154,14 +136,12 @@ class AgentRegistry {
 }
 
 // ============================================================================
-// Message Queue
+// Message Queue (Simple in-memory)
 // ============================================================================
 
 class MessageQueue {
-  constructor(maxSize = CONFIG.maxQueueSize) {
-    this.queues = new Map();        // agentId -> Message[]
-    this.maxSize = maxSize;
-    this.totalEnqueued = 0;
+  constructor() {
+    this.queues = new Map();
   }
 
   enqueue(agentId, message) {
@@ -170,29 +150,27 @@ class MessageQueue {
     }
     
     const queue = this.queues.get(agentId);
-    
-    // Remove oldest if at capacity
-    if (queue.length >= this.maxSize) {
-      queue.shift();
-      logger.debug(`Queue overflow for ${agentId}, dropped oldest message`);
-    }
-    
-    const msgWithMeta = {
+    const queuedMessage = {
       ...message,
       _id: crypto.randomUUID(),
       _enqueuedAt: Date.now()
     };
     
-    queue.push(msgWithMeta);
-    this.totalEnqueued++;
+    queue.push(queuedMessage);
     
-    return msgWithMeta._id;
+    if (queue.length > 1000) {
+      queue.shift();
+    }
+    
+    return queuedMessage._id;
   }
 
-  dequeue(agentId) {
+  dequeue(agentId, limit = 100) {
     const queue = this.queues.get(agentId);
-    if (!queue || queue.length === 0) return null;
-    return queue.shift();
+    if (!queue || queue.length === 0) return [];
+    
+    const messages = queue.splice(0, limit);
+    return messages;
   }
 
   getAll(agentId) {
@@ -200,36 +178,12 @@ class MessageQueue {
   }
 
   clear(agentId) {
-    const count = this.queues.get(agentId)?.length || 0;
-    this.queues.delete(agentId);
-    return count;
+    if (this.queues.has(agentId)) {
+      this.queues.set(agentId, []);
+    }
   }
 
-  cleanup(maxAgeMs) {
-    const now = Date.now();
-    let cleaned = 0;
-    
-    for (const [agentId, queue] of this.queues) {
-      const before = queue.length;
-      
-      const filtered = queue.filter(msg => {
-        const ttl = msg.metadata?.ttl || 0;
-        if (ttl === 0) return true;
-        return (now - msg._enqueuedAt) < (ttl * 1000);
-      });
-      
-      this.queues.set(agentId, filtered);
-      cleaned += before - filtered.length;
-    }
-    
-    if (cleaned > 0) {
-      logger.debug(`Cleaned ${cleaned} expired messages`);
-    }
-    
-    return cleaned;
-  }
-
-  totalMessages() {
+  getTotalSize() {
     let total = 0;
     for (const queue of this.queues.values()) {
       total += queue.length;
@@ -239,14 +193,13 @@ class MessageQueue {
 }
 
 // ============================================================================
-// Schema Validator (Simple Implementation)
+// Schema Validator
 // ============================================================================
 
 class SchemaValidator {
   validateEnvelope(message) {
     const errors = [];
     
-    // Required fields
     const required = ['id', 'type', 'version', 'timestamp', 'sender', 'payload'];
     for (const field of required) {
       if (!message[field]) {
@@ -254,21 +207,16 @@ class SchemaValidator {
       }
     }
     
-    // Validate type format
     if (message.type && !/^(task|message|status|handshake)\.(assign|update|complete|fail|direct|broadcast|heartbeat|sync|register|ack)$/.test(message.type)) {
       errors.push({ field: 'type', message: 'Invalid message type format' });
     }
     
-    // Validate version format
     if (message.version && !/^\d+\.\d+\.\d+$/.test(message.version)) {
       errors.push({ field: 'version', message: 'Invalid version format (expected x.y.z)' });
     }
     
-    // Validate sender
-    if (message.sender) {
-      if (!message.sender.id || !message.sender.role) {
-        errors.push({ field: 'sender', message: 'Sender must have id and role' });
-      }
+    if (message.sender && (!message.sender.id || !message.sender.role)) {
+      errors.push({ field: 'sender', message: 'Sender must have id and role' });
     }
     
     return {
@@ -284,7 +232,7 @@ class SchemaValidator {
       errors.push({ field: 'id', message: 'Agent id is required' });
     }
     
-    const validRoles = ['manager', 'developer', 'reviewer', 'tester', 'coordinator'];
+    const validRoles = ['manager', 'coordinator', 'developer', 'reviewer', 'tester'];
     if (!agent.role || !validRoles.includes(agent.role)) {
       errors.push({ field: 'role', message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
     }
@@ -297,37 +245,29 @@ class SchemaValidator {
 }
 
 // ============================================================================
-// Message Router
+// Message Router (with CallbackDispatcher)
 // ============================================================================
 
 class MessageRouter {
-  constructor(registry, queue) {
+  constructor(registry, queue, dispatcher) {
     this.registry = registry;
     this.queue = queue;
+    this.dispatcher = dispatcher;
     this.handlers = new Map();
   }
 
-  on(type, handler) {
-    if (!this.handlers.has(type)) {
-      this.handlers.set(type, []);
-    }
-    this.handlers.get(type).push(handler);
-  }
-
   async route(message) {
-    const { type, recipient, payload } = message;
+    const { type, recipient } = message;
     
-    // Trigger registered handlers
     const handlers = this.handlers.get(type) || [];
     for (const handler of handlers) {
       try {
         await handler(message);
       } catch (err) {
-        logger.error(`Handler error for ${type}:`, err.message);
+        logger.error(`Handler error for ${type}: ${err.message}`);
       }
     }
     
-    // Route by message type
     switch (type) {
       case 'handshake.register':
         return this.handleRegister(message);
@@ -348,145 +288,121 @@ class MessageRouter {
         return this.handleBroadcast(message);
       
       case 'status.sync':
-        return this.handleSync(message);
+        return this.handleStatusSync(message);
       
       default:
         return { success: false, error: `Unknown message type: ${type}` };
     }
   }
 
-  handleRegister(message) {
-    const { payload } = message;
-    const { agent } = payload;
-    
-    if (!agent) {
-      return { success: false, error: 'Agent info required' };
-    }
-    
-    try {
-      this.registry.register(agent);
-      
-      return {
-        success: true,
-        type: 'handshake.ack',
-        payload: {
-          success: true,
-          agentId: agent.id,
-          message: 'Registration successful',
-          config: {
-            heartbeatInterval: CONFIG.heartbeatInterval,
-            messageTimeout: 30000
-          }
-        }
-      };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  }
-
-  handleHeartbeat(message) {
-    const { payload } = message;
-    const { agentId, status, currentTask } = payload;
-    
-    if (!agentId) {
-      return { success: false, error: 'agentId required' };
-    }
-    
-    this.registry.updateHeartbeat(agentId);
-    
-    if (status) {
-      this.registry.updateStatus(agentId, status);
-    }
-    
-    const pending = this.queue.getAll(agentId);
-    
-    return {
-      success: true,
-      acknowledged: true,
-      pendingMessages: pending.length,
-      messages: pending
-    };
-  }
-
-  handleTaskMessage(message) {
-    const { recipient, type } = message;
-    
-    if (recipient && recipient.id) {
-      const msgId = this.queue.enqueue(recipient.id, message);
-      logger.debug(`Task ${type} delivered to ${recipient.id}`);
-      return { success: true, messageId: msgId, delivered: recipient.id };
-    }
-    
-    if (recipient && recipient.type === 'role' && recipient.target) {
-      const agents = this.registry.getByRole(recipient.target);
-      const results = agents.map(agent => ({
-        agentId: agent.id,
-        messageId: this.queue.enqueue(agent.id, message)
-      }));
-      return { success: true, delivered: results };
-    }
-    
-    return { success: false, error: 'No valid recipient' };
-  }
-
-  handleDirectMessage(message) {
+  async handleDirectMessage(message) {
     const { recipient } = message;
-    
+
     if (!recipient) {
       return { success: false, error: 'Recipient required for direct message' };
     }
-    
+
     if (recipient.id) {
+      if (this.dispatcher) {
+        const result = await this.dispatcher.push(recipient.id, message);
+        return { success: true, ...result };
+      }
       const msgId = this.queue.enqueue(recipient.id, message);
       return { success: true, messageId: msgId };
     }
-    
+
     if (recipient.type === 'role' && recipient.target) {
       const agents = this.registry.getByRole(recipient.target);
-      const results = agents.map(agent => ({
-        agentId: agent.id,
-        messageId: this.queue.enqueue(agent.id, message)
-      }));
+      const results = [];
+      for (const agent of agents) {
+        if (this.dispatcher) {
+          const result = await this.dispatcher.push(agent.id, message);
+          results.push({ agentId: agent.id, ...result });
+        } else {
+          const msgId = this.queue.enqueue(agent.id, message);
+          results.push({ agentId: agent.id, messageId: msgId });
+        }
+      }
       return { success: true, delivered: results };
     }
-    
+
     return { success: false, error: 'Invalid recipient specification' };
   }
 
-  handleBroadcast(message) {
+  async handleTaskMessage(message) {
+    const { recipient, type } = message;
+
+    if (recipient && recipient.id) {
+      if (this.dispatcher) {
+        const result = await this.dispatcher.push(recipient.id, message);
+        return { success: true, type, ...result };
+      }
+      const msgId = this.queue.enqueue(recipient.id, message);
+      return { success: true, messageId: msgId, delivered: recipient.id };
+    }
+
+    if (recipient && recipient.type === 'role' && recipient.target) {
+      const agents = this.registry.getByRole(recipient.target);
+      const results = [];
+      for (const agent of agents) {
+        if (this.dispatcher) {
+          const result = await this.dispatcher.push(agent.id, message);
+          results.push({ agentId: agent.id, ...result });
+        } else {
+          results.push({
+            agentId: agent.id,
+            messageId: this.queue.enqueue(agent.id, message)
+          });
+        }
+      }
+      return { success: true, delivered: results };
+    }
+
+    return { success: false, error: 'No valid recipient' };
+  }
+
+  async handleBroadcast(message) {
+    if (this.dispatcher) {
+      const senderId = message.sender?.id;
+      const results = await this.dispatcher.pushBroadcast(message, senderId);
+      return {
+        success: true,
+        broadcast: true,
+        delivered: results.filter(r => r.delivered).length,
+        results
+      };
+    }
+
     const agents = this.registry.getAll().filter(a => a.status !== 'offline');
-    
     const results = agents.map(agent => ({
       agentId: agent.id,
       messageId: this.queue.enqueue(agent.id, message)
     }));
-    
-    logger.info(`Broadcast to ${results.length} agents`);
     return { success: true, broadcast: true, delivered: results.length, results };
   }
 
-  handleSync(message) {
-    const agents = this.registry.getAll().map(a => ({
-      id: a.id,
-      role: a.role,
-      name: a.name,
-      status: a.status,
-      capabilities: a.capabilities
-    }));
-    
-    return {
-      success: true,
-      type: 'status.sync',
-      payload: {
-        agents,
-        syncToken: Date.now().toString(36)
-      }
-    };
+  handleRegister(message) {
+    return { success: true, message: 'Registration acknowledged' };
+  }
+
+  handleHeartbeat(message) {
+    return { success: true, message: 'Heartbeat received' };
+  }
+
+  handleStatusSync(message) {
+    return this.handleBroadcast(message);
+  }
+
+  on(type, handler) {
+    if (!this.handlers.has(type)) {
+      this.handlers.set(type, []);
+    }
+    this.handlers.get(type).push(handler);
   }
 }
 
 // ============================================================================
-// Mailbox Hub HTTP Server
+// Mailbox Hub (Main Server)
 // ============================================================================
 
 class MailboxHub {
@@ -494,8 +410,16 @@ class MailboxHub {
     this.registry = new AgentRegistry();
     this.queue = new MessageQueue();
     this.validator = new SchemaValidator();
-    this.router = new MessageRouter(this.registry, this.queue);
+    this.messageStore = messageStore;
     
+    this.dispatcher = new CallbackDispatcher(this.registry, this.queue, {
+      maxRetries: CONFIG.maxRetries,
+      retryBaseDelay: CONFIG.callbackTimeout / 5,
+      callbackTimeout: CONFIG.callbackTimeout,
+    });
+    
+    this.router = new MessageRouter(this.registry, this.queue, this.dispatcher);
+
     this.server = null;
     this.heartbeatChecker = null;
     this.cleanupInterval = null;
@@ -506,23 +430,13 @@ class MailboxHub {
     this.startTime = Date.now();
     
     this.server = http.createServer((req, res) => this.handleRequest(req, res));
-    
     this.server.listen(CONFIG.port, CONFIG.host, () => {
-      logger.info(`Mailbox Hub started on http://${CONFIG.host}:${CONFIG.port}`);
+      logger.info(`Mailbox Hub v2.0 listening on http://${CONFIG.host}:${CONFIG.port}`);
     });
     
-    // Heartbeat checker
-    this.heartbeatChecker = setInterval(() => {
-      const timedOut = this.registry.checkTimeouts(CONFIG.heartbeatTimeout);
-      if (timedOut.length > 0) {
-        logger.info(`Heartbeat timeout: ${timedOut.length} agents marked offline`);
-      }
-    }, CONFIG.heartbeatInterval);
+    this.heartbeatChecker = setInterval(() => this.checkHeartbeats(), CONFIG.heartbeatInterval);
     
-    // Message cleanup
-    this.cleanupInterval = setInterval(() => {
-      this.queue.cleanup(CONFIG.messageRetention);
-    }, 60000);
+    this.cleanupInterval = setInterval(() => this.cleanupOldMessages(), 60000);
     
     return this;
   }
@@ -530,28 +444,29 @@ class MailboxHub {
   stop() {
     if (this.heartbeatChecker) clearInterval(this.heartbeatChecker);
     if (this.cleanupInterval) clearInterval(this.cleanupInterval);
-    if (this.server) this.server.close();
-    logger.info('Mailbox Hub stopped');
+    if (this.server) {
+      this.server.close(() => {
+        logger.info('Mailbox Hub stopped');
+      });
+    }
   }
 
   async handleRequest(req, res) {
     const parsedUrl = url.parse(req.url, true);
     const { pathname, query } = parsedUrl;
     const method = req.method;
-    
-    // CORS headers
+    const startTime = Date.now();
+
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
     if (method === 'OPTIONS') {
       res.writeHead(204);
       res.end();
       return;
     }
-    
-    const startTime = Date.now();
-    
+
     try {
       const result = await this.routePath(method, pathname, req, query);
       
@@ -571,92 +486,26 @@ class MailboxHub {
   }
 
   async routePath(method, pathname, req, query) {
-    // ===== POST /register - Register Agent =====
     if (method === 'POST' && pathname === '/register') {
       const body = await this.parseBody(req);
       return this.handleRegister(body);
     }
     
-    // ===== POST /message - Send Message =====
     if (method === 'POST' && pathname === '/message') {
       const body = await this.parseBody(req);
       return this.handleMessage(body);
     }
     
-    // ===== GET /messages - Get Messages for Agent =====
-    if (method === 'GET' && pathname === '/messages') {
-      const agentId = query.agentId;
-      if (!agentId) {
-        return { status: 400, body: { success: false, error: 'agentId query parameter required' } };
-      }
-      
-      const messages = this.queue.getAll(agentId);
-      return {
-        status: 200,
-        body: {
-          success: true,
-          agentId,
-          count: messages.length,
-          messages
-        }
-      };
+    if (method === 'POST' && pathname === '/broadcast') {
+      const body = await this.parseBody(req);
+      return this.handleBroadcast(body);
     }
     
-    // ===== DELETE /messages - Clear Messages =====
-    if (method === 'DELETE' && pathname === '/messages') {
-      const agentId = query.agentId;
-      if (!agentId) {
-        return { status: 400, body: { success: false, error: 'agentId query parameter required' } };
-      }
-      
-      const count = this.queue.clear(agentId);
-      return {
-        status: 200,
-        body: { success: true, cleared: count }
-      };
-    }
-    
-    // ===== GET /agents - List All Agents =====
-    if (method === 'GET' && pathname === '/agents') {
-      const role = query.role;
-      const agents = role ? this.registry.getByRole(role) : this.registry.getAll();
-      
-      return {
-        status: 200,
-        body: {
-          success: true,
-          count: agents.length,
-          agents
-        }
-      };
-    }
-    
-    // ===== GET /agents/:id - Get Agent by ID =====
-    const agentByIdMatch = pathname.match(/^\/agents\/(agent-[a-z0-9-]+)$/);
-    if (method === 'GET' && agentByIdMatch) {
-      const agent = this.registry.get(agentByIdMatch[1]);
-      if (!agent) {
-        return { status: 404, body: { success: false, error: 'Agent not found' } };
-      }
-      return { status: 200, body: { success: true, agent } };
-    }
-    
-    // ===== DELETE /agents/:id - Unregister Agent =====
-    if (method === 'DELETE' && agentByIdMatch) {
-      const removed = this.registry.unregister(agentByIdMatch[1]);
-      return {
-        status: removed ? 200 : 404,
-        body: { success: removed }
-      };
-    }
-    
-    // ===== POST /heartbeat - Agent Heartbeat =====
     if (method === 'POST' && pathname === '/heartbeat') {
       const body = await this.parseBody(req);
       return this.handleHeartbeat(body);
     }
     
-    // ===== GET /health - Health Check =====
     if (method === 'GET' && pathname === '/health') {
       return {
         status: 200,
@@ -665,38 +514,60 @@ class MailboxHub {
           status: 'healthy',
           uptime: Math.floor((Date.now() - this.startTime) / 1000),
           agents: this.registry.count(),
-          messages: this.queue.totalMessages()
+          messages: this.queue.getTotalSize()
         }
       };
     }
     
-    // ===== GET /stats - Statistics =====
-    if (method === 'GET' && pathname === '/stats') {
-      const agents = this.registry.getAll();
+    if (method === 'GET' && pathname === '/agents') {
       return {
         status: 200,
         body: {
           success: true,
-          stats: {
-            uptime: Math.floor((Date.now() - this.startTime) / 1000),
-            agents: {
-              total: agents.length,
-              byStatus: this.groupBy(agents, 'status'),
-              byRole: this.groupBy(agents, 'role')
-            },
-            messages: {
-              total: this.queue.totalMessages(),
-              totalEnqueued: this.queue.totalEnqueued
-            }
-          }
+          count: this.registry.count(),
+          agents: this.registry.getAll()
         }
       };
     }
     
-    // ===== POST /broadcast - Broadcast Message =====
-    if (method === 'POST' && pathname === '/broadcast') {
-      const body = await this.parseBody(req);
-      return this.handleBroadcast(body);
+    if (method === 'GET' && pathname === '/messages') {
+      const agentId = query.agentId;
+      if (!agentId) {
+        return { status: 400, body: { success: false, error: 'agentId required' } };
+      }
+      const messages = this.queue.dequeue(agentId);
+      return {
+        status: 200,
+        body: { success: true, agentId, count: messages.length, messages }
+      };
+    }
+    
+    if (method === 'GET' && pathname === '/messages/history') {
+      const agentId = query.agentId || null;
+      const limit = parseInt(query.limit) || 100;
+
+      if (!this.messageStore) {
+        return { status: 501, body: { success: false, error: 'MessageStore not enabled' } };
+      }
+
+      const messages = this.messageStore.getAll(agentId, limit);
+      return {
+        status: 200,
+        body: { success: true, count: messages.length, messages }
+      };
+    }
+    
+    if (method === 'GET' && pathname === '/messages/search') {
+      const q = query.q;
+      if (!q) {
+        return { status: 400, body: { success: false, error: 'q parameter required' } };
+      }
+
+      const results = this.messageStore.search(q, parseInt(query.limit) || 50);
+      return {
+        status: 200,
+        body: { success: true, count: results.length, messages: results }
+      };
     }
     
     return null;
@@ -704,24 +575,25 @@ class MailboxHub {
 
   handleRegister(body) {
     const { agent, token } = body;
-    
+
     if (!agent) {
       return { status: 400, body: { success: false, error: 'Agent info required' } };
     }
-    
+
     const validation = this.validator.validateAgent(agent);
     if (!validation.valid) {
       return { status: 400, body: { success: false, errors: validation.errors } };
     }
-    
+
     try {
       this.registry.register(agent);
-      
+
       return {
         status: 200,
         body: {
           success: true,
           agentId: agent.id,
+          callbackEnabled: !!agent.callbackUrl,
           message: 'Registration successful',
           config: {
             heartbeatInterval: CONFIG.heartbeatInterval / 1000,
@@ -734,83 +606,107 @@ class MailboxHub {
     }
   }
 
-  handleMessage(body) {
+  async handleMessage(body) {
     const validation = this.validator.validateEnvelope(body);
     if (!validation.valid) {
       return { status: 400, body: { success: false, errors: validation.errors } };
     }
     
-    const result = this.router.route(body);
+    // Check for message loop
+    const turn = body.metadata?.turn || 0;
+    if (turn > 20) {
+      logger.error(`Message loop detected: ${body.id} (turn ${turn})`);
+      return {
+        status: 429,
+        body: {
+          success: false,
+          error: 'Message loop detected: exceeded max conversation turns'
+        }
+      };
+    }
+
+    // Persist message
+    if (this.messageStore) {
+      try {
+        this.messageStore.save(body);
+      } catch (err) {
+        logger.error(`Message persistence failed: ${err.message}`);
+      }
+    }
+
+    const result = await this.router.route(body);
+    return { status: 200, body: result };
+  }
+
+  async handleBroadcast(body) {
+    const message = {
+      id: body.id || `msg-broadcast-${Date.now()}`,
+      type: 'message.broadcast',
+      version: '1.1.0',
+      timestamp: new Date().toISOString(),
+      sender: body.sender || { id: 'unknown' },
+      payload: {
+        subject: body.subject,
+        content: body.content,
+        urgent: body.urgent || false
+      },
+      metadata: body.metadata || {}
+    };
+
+    const result = await this.router.handleBroadcast(message);
     return { status: 200, body: result };
   }
 
   handleHeartbeat(body) {
-    const { agentId, status, currentTask, metrics } = body;
-    
+    const { agentId, status } = body;
+
     if (!agentId) {
       return { status: 400, body: { success: false, error: 'agentId required' } };
     }
-    
+
     const agent = this.registry.get(agentId);
     if (!agent) {
       return { status: 404, body: { success: false, error: 'Agent not found' } };
     }
-    
+
     this.registry.updateHeartbeat(agentId);
     
     if (status) {
       this.registry.updateStatus(agentId, status);
     }
-    
-    const messages = this.queue.getAll(agentId);
-    
-    return {
-      status: 200,
-      body: {
-        success: true,
-        acknowledged: true,
-        pendingMessages: messages.length,
-        messages
-      }
-    };
+
+    return { status: 200, body: { success: true, agentId, status: agent.status } };
   }
 
-  handleBroadcast(body) {
-    const { subject, content, urgent } = body;
+  checkHeartbeats() {
+    const now = Date.now();
+    const timeout = CONFIG.heartbeatTimeout;
     
-    const message = {
-      id: crypto.randomUUID(),
-      type: 'message.broadcast',
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-      sender: { id: 'mailbox-hub', role: 'manager' },
-      payload: {
-        subject,
-        content,
-        urgent: urgent || false
+    for (const agent of this.registry.getAll()) {
+      if (now - agent.lastHeartbeat > timeout) {
+        const oldStatus = agent.status;
+        agent.status = 'offline';
+        
+        if (oldStatus !== 'offline') {
+          logger.info(`Agent ${agent.id} went offline (no heartbeat for ${Math.floor((now - agent.lastHeartbeat) / 1000)}s)`);
+        }
       }
-    };
+    }
+  }
+
+  cleanupOldMessages() {
+    if (!this.messageStore) return;
     
-    const agents = this.registry.getAll().filter(a => a.status !== 'offline');
-    const results = agents.map(agent => ({
-      agentId: agent.id,
-      messageId: this.queue.enqueue(agent.id, message)
-    }));
-    
-    return {
-      status: 200,
-      body: {
-        success: true,
-        broadcast: true,
-        delivered: results.length
-      }
-    };
+    const cleaned = this.messageStore.cleanup(30);
+    if (cleaned > 0) {
+      logger.info(`Cleaned up ${cleaned} old messages`);
+    }
   }
 
   parseBody(req) {
     return new Promise((resolve, reject) => {
       let body = '';
-      req.on('data', chunk => { body += chunk; });
+      req.on('data', chunk => body += chunk);
       req.on('end', () => {
         try {
           resolve(body ? JSON.parse(body) : {});
@@ -826,14 +722,6 @@ class MailboxHub {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(body));
   }
-
-  groupBy(arr, key) {
-    return arr.reduce((acc, item) => {
-      const val = item[key] || 'unknown';
-      acc[val] = (acc[val] || 0) + 1;
-      return acc;
-    }, {});
-  }
 }
 
 // ============================================================================
@@ -844,15 +732,13 @@ if (require.main === module) {
   const hub = new MailboxHub();
   hub.start();
   
-  // Graceful shutdown
   process.on('SIGINT', () => {
-    logger.info('Shutting down...');
+    console.log('\nShutting down...');
     hub.stop();
     process.exit(0);
   });
   
   process.on('SIGTERM', () => {
-    logger.info('Shutting down...');
     hub.stop();
     process.exit(0);
   });
@@ -862,7 +748,7 @@ module.exports = {
   MailboxHub,
   AgentRegistry,
   MessageQueue,
-  MessageRouter,
   SchemaValidator,
+  MessageRouter,
   CONFIG
 };
