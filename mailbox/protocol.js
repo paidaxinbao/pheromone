@@ -94,10 +94,122 @@ function validateMessage(msg) {
   return { valid: true };
 }
 
+// ========== 可靠性配置 ==========
+
+const RELIABILITY_CONFIG = {
+  // 消息确认超时（毫秒）
+  ackTimeout: 30000,
+  
+  // 最大重试次数
+  maxRetries: 3,
+  
+  // 重试延迟（毫秒）- 指数退避基数
+  retryDelayBase: 1000,
+  
+  // 消息默认TTL（秒）
+  defaultTTL: 3600,
+  
+  // 心跳间隔（毫秒）
+  heartbeatInterval: 30000,
+  
+  // 心跳超时（毫秒）- 3次心跳未响应视为离线
+  heartbeatTimeout: 90000
+};
+
+/**
+ * 创建确认消息 (ACK)
+ */
+function createAck(originalMessageId, from, to, success = true, error = null) {
+  return {
+    id: `ack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    from,
+    to,
+    type: success ? MESSAGE_TYPES.ACK : MESSAGE_TYPES.NACK,
+    content: {
+      originalMessageId,
+      success,
+      error,
+      timestamp: new Date().toISOString()
+    },
+    timestamp: new Date().toISOString(),
+    priority: MESSAGE_PRIORITY.HIGH,
+    metadata: { correlationId: originalMessageId }
+  };
+}
+
+/**
+ * 创建心跳消息
+ */
+function createHeartbeat(agentId, status, currentTask = null, metrics = {}) {
+  return {
+    id: `hb-${Date.now()}`,
+    from: agentId,
+    to: 'manager',
+    type: MESSAGE_TYPES.HEARTBEAT,
+    content: {
+      agentId,
+      status,
+      currentTask,
+      metrics,
+      timestamp: new Date().toISOString()
+    },
+    timestamp: new Date().toISOString(),
+    priority: MESSAGE_PRIORITY.BACKGROUND,
+    metadata: { ttl: 60 } // 心跳消息60秒后过期
+  };
+}
+
+/**
+ * 计算重试延迟（指数退避 + 随机抖动）
+ */
+function calculateRetryDelay(attempt, baseDelay = RELIABILITY_CONFIG.retryDelayBase) {
+  // 指数退避: baseDelay * 2^attempt
+  const exponentialDelay = baseDelay * Math.pow(2, attempt);
+  // 添加随机抖动 (0-25%)
+  const jitter = exponentialDelay * 0.25 * Math.random();
+  return Math.min(exponentialDelay + jitter, 60000); // 最大60秒
+}
+
+/**
+ * 检查消息是否过期
+ */
+function isMessageExpired(msg) {
+  const ttl = msg.metadata?.ttl || RELIABILITY_CONFIG.defaultTTL;
+  if (ttl === 0) return false; // TTL=0 表示永不过期
+  
+  const msgTime = new Date(msg.timestamp).getTime();
+  const now = Date.now();
+  return (now - msgTime) > (ttl * 1000);
+}
+
+/**
+ * 创建带可靠性的消息
+ */
+function createReliableMessage(from, to, type, content, options = {}) {
+  const msg = createMessage(from, to, type, content, options);
+  
+  // 添加可靠性元数据
+  msg.metadata = {
+    ...msg.metadata,
+    ttl: options.ttl || RELIABILITY_CONFIG.defaultTTL,
+    requiresAck: options.requiresAck !== false, // 默认需要确认
+    retryCount: 0,
+    maxRetries: options.maxRetries || RELIABILITY_CONFIG.maxRetries
+  };
+  
+  return msg;
+}
+
 module.exports = {
   MESSAGE_TYPES,
   AGENT_ROLES,
   MESSAGE_PRIORITY,
+  RELIABILITY_CONFIG,
   createMessage,
-  validateMessage
+  validateMessage,
+  createAck,
+  createHeartbeat,
+  calculateRetryDelay,
+  isMessageExpired,
+  createReliableMessage
 };
