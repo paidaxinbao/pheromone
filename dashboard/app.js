@@ -99,11 +99,23 @@ function renderMessages(messages) {
   }
   
   log.innerHTML = messages.map(msg => {
-    const payloadText = msg.payload?.title || 
-                       msg.payload?.subject || 
-                       msg.payload?.content || 
-                       msg.payload?.taskId ||
-                       JSON.stringify(msg.payload);
+    // Get full message content
+    const subject = msg.payload?.subject || '';
+    const content = msg.payload?.content || msg.payload?.message || msg.payload?.description || '';
+    const taskId = msg.payload?.taskId || '';
+    const progress = msg.payload?.progress ? ` (${msg.payload.progress}%)` : '';
+    const status = msg.payload?.status || '';
+    
+    // Build full content display
+    let fullContent = '';
+    if (subject) fullContent += `<strong>${escapeHtml(subject)}</strong><br>`;
+    if (content) fullContent += `<div style="margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">${escapeHtml(content)}</div>`;
+    if (taskId) fullContent += `<div style="margin-top: 8px; font-size: 0.85em; color: #888;">Task: ${escapeHtml(taskId)}${progress} ${status ? `• ${status}` : ''}</div>`;
+    
+    // If no content, show payload as JSON
+    if (!fullContent) {
+      fullContent = `<code style="font-size: 0.85em;">${escapeHtml(JSON.stringify(msg.payload, null, 2))}</code>`;
+    }
     
     return `
       <div class="message-item">
@@ -111,16 +123,24 @@ function renderMessages(messages) {
           <span class="message-type">${msg.type}</span>
           <span class="message-time">${formatTime(msg.timestamp)}</span>
         </div>
-        <div class="message-body">
-          ${payloadText}
+        <div class="message-body" style="margin-top: 10px;">
+          ${fullContent}
         </div>
-        <div class="message-sender">
-          From: ${msg.sender?.id} (${msg.sender?.role}) → 
-          To: ${msg.recipient?.id || 'broadcast'} (${msg.recipient?.role || 'all'})
+        <div class="message-sender" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <strong>From:</strong> ${msg.sender?.id} (${msg.sender?.role}) → 
+          <strong>To:</strong> ${msg.recipient?.id || 'broadcast'} (${msg.recipient?.role || 'all'})
         </div>
       </div>
     `;
   }).join('');
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // Update hub health
