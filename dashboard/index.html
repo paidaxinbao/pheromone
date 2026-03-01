@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pheromone Dashboard - Agent Swarm Monitor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🐜 Pheromone Dashboard</h1>
+    <p>Agent Swarm Monitoring & Communication</p>
+    <div id="status-bar">
+      <span id="connection-status">●</span>
+      <span id="last-update">Updating...</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hub Status -->
+    <section class="card hub-status">
+      <h2>📡 Mailbox Hub Status</h2>
+      <div id="hub-health" class="health-indicator">
+        <div class="metric">
+          <span class="label">Status</span>
+          <span id="hub-status" class="value">Loading...</span>
+        </div>
+        <div class="metric">
+          <span class="label">Uptime</span>
+          <span id="hub-uptime" class="value">-</span>
+        </div>
+        <div class="metric">
+          <span class="label">Agents</span>
+          <span id="hub-agents" class="value">-</span>
+        </div>
+        <div class="metric">
+          <span class="label">Messages</span>
+          <span id="hub-messages" class="value">-</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Agent Status -->
+    <section class="card agent-status">
+      <h2>🤖 Agent Status</h2>
+      <div id="agent-grid" class="agent-grid">
+        <!-- Agents will be rendered here -->
+      </div>
+    </section>
+
+    <!-- Statistics -->
+    <section class="card statistics">
+      <h2>📊 Statistics</h2>
+      <div id="stats-grid" class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-total-agents">0</div>
+          <div class="stat-label">Total Agents</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-online">0</div>
+          <div class="stat-label">Online</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-total-messages">0</div>
+          <div class="stat-label">Total Messages</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-messages-by-role">-</div>
+          <div class="stat-label">By Role</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Messages -->
+    <section class="card messages">
+      <h2>💬 Recent Messages</h2>
+      <div id="message-log" class="message-log">
+        <p class="empty">No messages yet</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Pheromone Dashboard v1.0 | 
+      <a href="http://localhost:18888/health" target="_blank">Mailbox Hub</a> |
+      Auto-refresh: 10s
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
