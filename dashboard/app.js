@@ -1,6 +1,6 @@
 /**
- * Pheromone Dashboard v3.3
- * Enhanced Landing Page + Cluster Swarm + Slide-in Messages
+ * Pheromone Dashboard v3.4
+ * HeroUI Inspired + Interactive Swarm + Breathing Effect + Ripple Animation
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -9,13 +9,15 @@ let messages = [];
 let swarmVisible = false;
 let canvas, ctx;
 let currentModalAction = null;
+let draggedNode = null;
+let nodePositions = {};
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v3.3 initialized');
+  console.log('🐜 Pheromone Dashboard v3.4 initialized');
   
   // Initial data fetch
   updateDashboard();
@@ -66,6 +68,11 @@ function toggleSwarm() {
       drawSwarm();
     }, 100);
   }
+}
+
+function resetSwarmView() {
+  nodePositions = {};
+  drawSwarm();
 }
 
 // ============================================================================
@@ -215,7 +222,7 @@ function renderMessage(msg) {
 }
 
 // ============================================================================
-// Swarm Visualization (Cluster by Role, Workflow-style Lines)
+// Interactive Swarm Visualization
 // ============================================================================
 
 function initCanvas() {
@@ -224,6 +231,18 @@ function initCanvas() {
   
   ctx = canvas.getContext('2d');
   resizeCanvas();
+  
+  // Mouse events for dragging
+  canvas.addEventListener('mousedown', handleMouseDown);
+  canvas.addEventListener('mousemove', handleMouseMove);
+  canvas.addEventListener('mouseup', handleMouseUp);
+  canvas.addEventListener('mouseout', handleMouseUp);
+  
+  // Touch events for mobile
+  canvas.addEventListener('touchstart', handleTouchStart);
+  canvas.addEventListener('touchmove', handleTouchMove);
+  canvas.addEventListener('touchend', handleMouseUp);
+  
   window.addEventListener('resize', resizeCanvas);
 }
 
@@ -231,7 +250,92 @@ function resizeCanvas() {
   if (!canvas) return;
   const container = canvas.parentElement;
   canvas.width = container.offsetWidth;
-  canvas.height = 500;
+  canvas.height = 600;
+  
+  // Re-initialize positions on resize
+  if (agents.length > 0 && Object.keys(nodePositions).length === 0) {
+    initializeNodePositions();
+  }
+}
+
+function initializeNodePositions() {
+  nodePositions = {};
+  
+  // Random initial positions
+  agents.forEach(agent => {
+    const padding = 100;
+    nodePositions[agent.id] = {
+      x: padding + Math.random() * (canvas.width - padding * 2),
+      y: padding + Math.random() * (canvas.height - padding * 2),
+      role: agent.role,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.2,
+      breathing: Math.random() * Math.PI * 2
+    };
+  });
+}
+
+function handleMouseDown(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  // Check if clicking on a node
+  for (const [id, pos] of Object.entries(nodePositions)) {
+    const dx = x - pos.x;
+    const dy = y - pos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 20) {
+      draggedNode = id;
+      canvas.style.cursor = 'grabbing';
+      
+      // Show agent details
+      showAgentDetails(id);
+      break;
+    }
+  }
+}
+
+function handleMouseMove(e) {
+  if (!draggedNode) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  // Update node position
+  nodePositions[draggedNode].x = x;
+  nodePositions[draggedNode].y = y;
+  
+  drawSwarm();
+}
+
+function handleMouseUp() {
+  draggedNode = null;
+  if (canvas) {
+    canvas.style.cursor = 'grab';
+  }
+}
+
+function handleTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousedown', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  handleMouseDown(mouseEvent);
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  handleMouseMove(mouseEvent);
 }
 
 function drawSwarm() {
@@ -247,46 +351,31 @@ function drawSwarm() {
     return;
   }
   
-  // Group agents by role
-  const groups = {
-    manager: agents.filter(a => a.role === 'manager'),
-    developer: agents.filter(a => a.role === 'developer'),
-    reviewer: agents.filter(a => a.role === 'reviewer'),
-    tester: agents.filter(a => a.role === 'tester')
-  };
+  // Initialize positions if needed
+  if (Object.keys(nodePositions).length === 0) {
+    initializeNodePositions();
+  }
   
-  // Calculate cluster positions
-  const clusterPositions = {
-    manager: { x: canvas.width / 2, y: canvas.height * 0.2 },
-    developer: { x: canvas.width * 0.25, y: canvas.height * 0.5 },
-    reviewer: { x: canvas.width * 0.75, y: canvas.height * 0.5 },
-    tester: { x: canvas.width / 2, y: canvas.height * 0.8 }
-  };
-  
-  // Calculate node positions within clusters
-  const nodePositions = {};
-  Object.keys(groups).forEach(role => {
-    const group = groups[role];
-    if (group.length === 0) return;
-    
-    const center = clusterPositions[role];
-    const radius = 80;
-    
-    group.forEach((agent, index) => {
-      const angle = (index / group.length) * Math.PI * 2 - Math.PI / 2;
-      nodePositions[agent.id] = {
-        x: center.x + Math.cos(angle) * radius,
-        y: center.y + Math.sin(angle) * radius,
-        role: role
-      };
-    });
+  // Update positions
+  Object.values(nodePositions).forEach(pos => {
+    if (pos !== draggedNode) {
+      pos.x += pos.vx;
+      pos.y += pos.vy;
+      pos.breathing += 0.05;
+      
+      // Boundary check with bounce
+      if (pos.x < 50 || pos.x > canvas.width - 50) pos.vx *= -1;
+      if (pos.y < 50 || pos.y > canvas.height - 50) pos.vy *= -1;
+    }
   });
   
-  // Draw workflow-style connections (thicker lines)
+  // Draw connections (workflow-style, thicker lines)
   ctx.lineWidth = 3;
-  Object.values(nodePositions).forEach((pos1, i) => {
-    Object.values(nodePositions).forEach((pos2, j) => {
-      if (i >= j) return;
+  const positions = Object.entries(nodePositions);
+  for (let i = 0; i < positions.length; i++) {
+    for (let j = i + 1; j < positions.length; j++) {
+      const [id1, pos1] = positions[i];
+      const [id2, pos2] = positions[j];
       
       const gradient = ctx.createLinearGradient(pos1.x, pos1.y, pos2.x, pos2.y);
       gradient.addColorStop(0, getRoleColor(pos1.role) + '60');
@@ -297,40 +386,106 @@ function drawSwarm() {
       ctx.lineTo(pos2.x, pos2.y);
       ctx.strokeStyle = gradient;
       ctx.stroke();
-    });
-  });
+    }
+  }
   
   // Draw nodes
-  Object.entries(nodePositions).forEach(([id, pos]) => {
-    const dotSize = 15;
+  positions.forEach(([id, pos]) => {
+    // Breathing effect
+    const breath = Math.sin(pos.breathing) * 3;
+    const baseRadius = 15;
+    const radius = baseRadius + breath;
+    
+    // Draw ripple if agent is working (breathing strongly)
+    if (Math.abs(breath) > 2) {
+      const rippleRadius = radius + 10 + Math.sin(pos.breathing * 2) * 5;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = getRoleColor(pos.role) + '40';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    
+    // Draw outer glow
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, radius * 0.5, pos.x, pos.y, radius * 2);
+    gradient.addColorStop(0, getRoleColor(pos.role) + '80');
+    gradient.addColorStop(1, getRoleColor(pos.role) + '00');
+    
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, radius * 2, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
     
     // Draw node
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, dotSize, 0, Math.PI * 2);
+    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
     ctx.fillStyle = getRoleColor(pos.role);
     ctx.fill();
     
-    // Draw label
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(id, pos.x, pos.y + dotSize + 18);
-    
-    // Draw role
-    ctx.fillStyle = getRoleColor(pos.role);
-    ctx.font = '10px sans-serif';
-    ctx.fillText(pos.role, pos.x, pos.y + dotSize + 32);
+    // Draw highlight
+    ctx.beginPath();
+    ctx.arc(pos.x - radius * 0.3, pos.y - radius * 0.3, radius * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.fill();
   });
+  
+  requestAnimationFrame(drawSwarm);
 }
 
 function getRoleColor(role) {
   const colors = {
     manager: '#ff6b6b',
-    developer: '#00d9ff',
-    reviewer: '#00ff88',
-    tester: '#ffa502'
+    developer: '#00d4ff',
+    reviewer: '#00ffa3',
+    tester: '#fbbf24'
   };
   return colors[role] || '#888';
+}
+
+// ============================================================================
+// Agent Details Modal
+// ============================================================================
+
+function showAgentDetails(agentId) {
+  const agent = agents.find(a => a.id === agentId);
+  if (!agent) return;
+  
+  const modal = document.getElementById('agent-modal');
+  const title = document.getElementById('agent-modal-title');
+  const body = document.getElementById('agent-modal-body');
+  
+  title.textContent = agentId;
+  body.innerHTML = `
+    <div class="agent-detail">
+      <div class="agent-detail-icon" style="background: ${getRoleColor(agent.role)};"></div>
+      <div class="agent-detail-id">${agent.id}</div>
+      <div class="agent-detail-role">${agent.role}</div>
+      
+      <div class="agent-detail-stats">
+        <div class="agent-detail-stat">
+          <div class="stat-value-large">${agent.status || 'idle'}</div>
+          <div class="stat-label-small">状态</div>
+        </div>
+        <div class="agent-detail-stat">
+          <div class="stat-value-large">${formatTime(agent.lastHeartbeat)}</div>
+          <div class="stat-label-small">最后活跃</div>
+        </div>
+      </div>
+      
+      ${agent.callbackUrl ? `
+        <div style="margin-top: 20px; padding: 15px; background: var(--bg-card-hover); border-radius: 8px;">
+          <div style="color: var(--text-muted); font-size: 0.8em; margin-bottom: 5px;">Callback URL</div>
+          <div style="font-family: 'SF Mono', monospace; font-size: 0.85em; word-break: break-all;">${agent.callbackUrl}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  
+  modal.classList.add('active');
+}
+
+function closeAgentModal() {
+  document.getElementById('agent-modal').classList.remove('active');
 }
 
 // ============================================================================
@@ -354,63 +509,6 @@ function confirmModal() {
     currentModalAction();
   }
   closeModal();
-}
-
-function openCreateAgent() {
-  const content = `
-    <div style="display: grid; gap: 15px;">
-      <div>
-        <label style="display: block; margin-bottom: 5px; color: #888;">Agent ID</label>
-        <input type="text" id="new-agent-id" placeholder="例如：dev-team-1">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 5px; color: #888;">角色</label>
-        <select id="new-agent-role">
-          <option value="developer">Developer</option>
-          <option value="reviewer">Reviewer</option>
-          <option value="tester">Tester</option>
-          <option value="manager">Manager</option>
-        </select>
-      </div>
-    </div>
-  `;
-  
-  openModal('➕ 创建 Agent', content, () => {
-    const id = document.getElementById('new-agent-id').value;
-    const role = document.getElementById('new-agent-role').value;
-    if (id && role) {
-      alert(`[牢张] 正在创建 Agent: ${id} (${role})...`);
-      // API call would go here
-    }
-  });
-}
-
-function openAssignTask() {
-  const content = `
-    <div style="display: grid; gap: 15px;">
-      <div>
-        <label style="display: block; margin-bottom: 5px; color: #888;">目标 Agent</label>
-        <input type="text" id="task-agent-id" placeholder="例如：dev-team-1">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 5px; color: #888;">任务标题</label>
-        <input type="text" id="task-title" placeholder="例如：实现用户模块">
-      </div>
-      <div>
-        <label style="display: block; margin-bottom: 5px; color: #888;">任务描述</label>
-        <textarea id="task-desc" placeholder="详细描述任务内容..." rows="3"></textarea>
-      </div>
-    </div>
-  `;
-  
-  openModal('📋 分配任务', content, () => {
-    const agentId = document.getElementById('task-agent-id').value;
-    const title = document.getElementById('task-title').value;
-    const desc = document.getElementById('task-desc').value;
-    if (agentId && title) {
-      alert(`[福瑞] 任务已分配给 ${agentId}，交给我吧！`);
-    }
-  });
 }
 
 function openBroadcast() {

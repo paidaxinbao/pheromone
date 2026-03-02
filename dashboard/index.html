@@ -3,23 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pheromone Dashboard</title>
+  <title>Pheromone - Agent Swarm Communication</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <!-- 着陆页 -->
   <main class="landing-page" id="landing-page">
-    <div class="landing-content">
-      <div class="hero-section">
-        <div class="hero-badge">Agent Swarm Communication System</div>
-        <h1 class="hero-title">
+    <!-- 导航 -->
+    <nav class="landing-nav">
+      <div class="nav-content">
+        <div class="nav-logo">
+          <span class="logo-icon">🐜</span>
+          <span class="logo-text">Pheromone</span>
+        </div>
+        <div class="nav-links">
+          <a href="#features">特性</a>
+          <a href="#swarm-intelligence">群体智能</a>
+          <a href="#pheromone">信息素</a>
+        </div>
+        <button class="btn btn-nav" onclick="enterDashboard()">进入控制台</button>
+      </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <div class="hero-badge fade-in-down">
+          <span class="badge-icon">✨</span>
+          <span>下一代 Agent 通信协议</span>
+        </div>
+        
+        <h1 class="hero-title fade-in-up">
           <span class="gradient-text">Pheromone</span>
+          <span class="title-subtitle">去中心化群体智能通信系统</span>
         </h1>
-        <p class="hero-description">
-          去中心化 Agent 通信协议<br>
-          实现高效、安全、可扩展的群体智能协作
+        
+        <p class="hero-description fade-in-up">
+          灵感源自自然界蜂群与蚁群的协作智慧<br>
+          通过信息素机制实现高效、安全、可扩展的 Agent 群体通信
         </p>
-        <div class="hero-stats">
+        
+        <div class="hero-stats fade-in-up">
           <div class="hero-stat">
             <div class="stat-number" id="landing-agents">0</div>
             <div class="stat-label">活跃 Agent</div>
@@ -33,7 +57,8 @@
             <div class="stat-label">运行时间</div>
           </div>
         </div>
-        <div class="cta-buttons">
+        
+        <div class="hero-cta fade-in-up">
           <button class="btn btn-primary btn-large" onclick="enterDashboard()">
             进入控制台
             <span class="btn-arrow">→</span>
@@ -45,37 +70,164 @@
         </div>
       </div>
       
-      <div class="features-section">
-        <div class="feature-card">
-          <div class="feature-icon">🔗</div>
-          <h3>去中心化通信</h3>
-          <p>基于信息素的消息路由协议，实现 Agent 间的高效通信</p>
+      <!-- 背景动画 -->
+      <div class="hero-bg-animation">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+      </div>
+    </section>
+    
+    <!-- 特性 Section -->
+    <section class="features-section" id="features">
+      <div class="section-content">
+        <div class="features-left">
+          <h2 class="section-title">核心特性</h2>
+          <p class="section-description">
+            基于自然启发的设计理念，打造高效可靠的 Agent 通信系统
+          </p>
+          
+          <div class="feature-list">
+            <div class="feature-item slide-in-left">
+              <div class="feature-icon">🔗</div>
+              <div class="feature-content">
+                <h3>去中心化通信</h3>
+                <p>基于信息素的消息路由协议，无需中心节点，实现 Agent 间的高效通信</p>
+              </div>
+            </div>
+            
+            <div class="feature-item slide-in-left">
+              <div class="feature-icon">🔒</div>
+              <div class="feature-content">
+                <h3>安全可靠</h3>
+                <p>消息持久化存储，支持回调确认机制，确保消息可靠送达，永不丢失</p>
+              </div>
+            </div>
+            
+            <div class="feature-item slide-in-left">
+              <div class="feature-icon">📊</div>
+              <div class="feature-content">
+                <h3>实时监控</h3>
+                <p>可视化蜂群状态，实时消息流，全面掌握系统运行状态，一目了然</p>
+              </div>
+            </div>
+            
+            <div class="feature-item slide-in-left">
+              <div class="feature-icon">⚡</div>
+              <div class="feature-content">
+                <h3>高性能</h3>
+                <p>异步消息处理，支持高并发，低延迟通信，满足大规模集群需求</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon">🔒</div>
-          <h3>安全可靠</h3>
-          <p>消息持久化存储，支持回调确认机制，确保消息可靠送达</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">📊</div>
-          <h3>实时监控</h3>
-          <p>可视化蜂群状态，实时消息流，全面掌握系统运行状态</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">⚡</div>
-          <h3>高性能</h3>
-          <p>异步消息处理，支持高并发，低延迟通信</p>
+        
+        <div class="features-right">
+          <div class="tech-visual">
+            <div class="visual-circle"></div>
+            <div class="visual-circle"></div>
+            <div class="visual-circle"></div>
+            <div class="visual-dot"></div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
     
+    <!-- 群体智能 Section -->
+    <section class="swarm-intelligence-section" id="swarm-intelligence">
+      <div class="section-content">
+        <div class="si-left">
+          <h2 class="section-title">群体智能启示</h2>
+          <p class="section-description">
+            自然界中的蜂群与蚁群展现出令人惊叹的协作能力
+          </p>
+          
+          <div class="si-cards">
+            <div class="si-card fade-in-up">
+              <div class="si-icon">🐝</div>
+              <h3>蜜蜂觅食</h3>
+              <p>蜜蜂通过舞蹈和化学信号传递食物位置信息，整个蜂群能够高效地采集资源</p>
+            </div>
+            
+            <div class="si-card fade-in-up">
+              <div class="si-icon">🐜</div>
+              <h3>蚂蚁路径</h3>
+              <p>蚂蚁在路径上留下信息素，其他蚂蚁跟随更强的信息素轨迹，形成最优路径</p>
+            </div>
+            
+            <div class="si-card fade-in-up">
+              <div class="si-icon">🧠</div>
+              <h3>集体决策</h3>
+              <p>蜂群通过信息素浓度进行集体决策，无需中央控制，实现自组织协作</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="si-right">
+          <div class="si-visual">
+            <div class="trail-animation"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- 信息素 Section -->
+    <section class="pheromone-section" id="pheromone">
+      <div class="section-content">
+        <div class="section-header-center">
+          <h2 class="section-title">信息素机制</h2>
+          <p class="section-description">
+            信息素是群体智能的核心，在 Pheromone 系统中扮演着至关重要的角色
+          </p>
+        </div>
+        
+        <div class="pheromone-grid">
+          <div class="pheromone-card fade-in-up">
+            <div class="ph-icon">📍</div>
+            <h3>路由指引</h3>
+            <p>信息素标记消息路径，引导消息准确到达目标 Agent，如同蚂蚁找到归巢路径</p>
+          </div>
+          
+          <div class="pheromone-card fade-in-up">
+            <div class="ph-icon">🔄</div>
+            <h3>动态调整</h3>
+            <p>信息素浓度随时间衰减，系统自动优化通信路径，保持网络高效运转</p>
+          </div>
+          
+          <div class="pheromone-card fade-in-up">
+            <div class="ph-icon">📢</div>
+            <h3>广播传播</h3>
+            <p>信息素在环境中扩散，实现一对多的消息广播，确保信息快速传播</p>
+          </div>
+          
+          <div class="pheromone-card fade-in-up">
+            <div class="ph-icon">🎯</div>
+            <h3>优先级标记</h3>
+            <p>不同强度的信息素表示消息优先级，紧急消息获得更快的处理速度</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- 页脚 -->
     <footer class="landing-footer">
-      <p>Pheromone Dashboard v3.3</p>
-      <p class="footer-links">
-        <a href="https://github.com/paidaxinbao/pheromone" target="_blank">GitHub</a>
-        <span>·</span>
-        <a href="http://localhost:18888/health" target="_blank">API</a>
-      </p>
+      <div class="footer-content">
+        <div class="footer-logo">
+          <span class="logo-icon">🐜</span>
+          <span class="logo-text">Pheromone</span>
+        </div>
+        <p class="footer-text">Agent Swarm Communication System</p>
+        <div class="footer-links">
+          <a href="https://github.com/paidaxinbao/pheromone" target="_blank">GitHub</a>
+          <span>·</span>
+          <a href="http://localhost:18888/health" target="_blank">API</a>
+          <span>·</span>
+          <a href="#" onclick="enterDashboard()">Dashboard</a>
+        </div>
+        <p class="footer-copyright">Pheromone Dashboard v3.4</p>
+      </div>
     </footer>
   </main>
   
@@ -89,10 +241,8 @@
         </h1>
         <div class="header-actions">
           <button class="btn btn-sm" onclick="exitDashboard()">← 返回</button>
-          <button class="btn btn-sm btn-icon" onclick="toggleSwarm()">🕸️</button>
-          <button class="btn btn-sm btn-icon" onclick="openCreateAgent()">➕</button>
-          <button class="btn btn-sm btn-icon" onclick="openAssignTask()">📋</button>
-          <button class="btn btn-sm btn-icon" onclick="openBroadcast()">📢</button>
+          <button class="btn btn-sm btn-icon" onclick="toggleSwarm()" title="显示蜂群">🕸️</button>
+          <button class="btn btn-sm btn-icon" onclick="openBroadcast()" title="广播消息">📢</button>
         </div>
       </div>
     </header>
@@ -133,10 +283,14 @@
       <section class="swarm-section" id="swarm-section" style="display: none;">
         <div class="section-header">
           <h2>蜂群可视化</h2>
-          <button class="btn btn-sm" onclick="toggleSwarm()">关闭</button>
+          <div class="section-actions">
+            <button class="btn btn-sm" onclick="resetSwarmView()">重置视图</button>
+            <button class="btn btn-sm" onclick="toggleSwarm()">关闭</button>
+          </div>
         </div>
         <div class="swarm-container">
           <canvas id="swarm-canvas"></canvas>
+          <div class="swarm-hint">💡 点击圆点查看 Agent 详情 · 拖拽移动位置</div>
           <div class="swarm-legend">
             <div class="legend-item">
               <span class="legend-dot manager"></span>
@@ -171,7 +325,18 @@
     </div>
   </main>
   
-  <!-- 弹窗 -->
+  <!-- Agent 详情弹窗 -->
+  <div class="modal-overlay" id="agent-modal">
+    <div class="modal-content agent-modal">
+      <div class="modal-header">
+        <h3 id="agent-modal-title">Agent 详情</h3>
+        <button class="modal-close" onclick="closeAgentModal()">&times;</button>
+      </div>
+      <div id="agent-modal-body" class="modal-body"></div>
+    </div>
+  </div>
+  
+  <!-- 广播弹窗 -->
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
