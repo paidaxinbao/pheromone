@@ -1,6 +1,6 @@
 /**
- * Pheromone Dashboard v3.4
- * HeroUI Inspired + Interactive Swarm + Breathing Effect + Ripple Animation
+ * Pheromone Dashboard v3.5
+ * Fixed Swarm Visualization - Breathing, Hover, Drag, Click
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -10,14 +10,16 @@ let swarmVisible = false;
 let canvas, ctx;
 let currentModalAction = null;
 let draggedNode = null;
+let hoveredNode = null;
 let nodePositions = {};
+let mousePos = { x: 0, y: 0 };
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v3.4 initialized');
+  console.log('🐜 Pheromone Dashboard v3.5 initialized');
   
   // Initial data fetch
   updateDashboard();
@@ -72,6 +74,7 @@ function toggleSwarm() {
 
 function resetSwarmView() {
   nodePositions = {};
+  initializeNodePositions();
   drawSwarm();
 }
 
@@ -111,9 +114,9 @@ async function updateDashboard() {
     // Update last update time
     document.getElementById('last-update').textContent = `更新于 ${new Date().toLocaleTimeString('zh-CN')}`;
     
-    // Redraw swarm if visible
+    // Update swarm if visible
     if (swarmVisible) {
-      drawSwarm();
+      updateNodePositions();
     }
   } catch (error) {
     console.error('Update failed:', error);
@@ -222,7 +225,7 @@ function renderMessage(msg) {
 }
 
 // ============================================================================
-// Interactive Swarm Visualization
+// Interactive Swarm Visualization (FIXED)
 // ============================================================================
 
 function initCanvas() {
@@ -232,18 +235,21 @@ function initCanvas() {
   ctx = canvas.getContext('2d');
   resizeCanvas();
   
-  // Mouse events for dragging
-  canvas.addEventListener('mousedown', handleMouseDown);
+  // Mouse events
   canvas.addEventListener('mousemove', handleMouseMove);
+  canvas.addEventListener('mousedown', handleMouseDown);
   canvas.addEventListener('mouseup', handleMouseUp);
-  canvas.addEventListener('mouseout', handleMouseUp);
+  canvas.addEventListener('mouseleave', handleMouseLeave);
   
-  // Touch events for mobile
-  canvas.addEventListener('touchstart', handleTouchStart);
-  canvas.addEventListener('touchmove', handleTouchMove);
+  // Touch events
+  canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+  canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
   canvas.addEventListener('touchend', handleMouseUp);
   
   window.addEventListener('resize', resizeCanvas);
+  
+  // Start animation loop
+  requestAnimationFrame(animateSwarm);
 }
 
 function resizeCanvas() {
@@ -261,71 +267,117 @@ function resizeCanvas() {
 function initializeNodePositions() {
   nodePositions = {};
   
-  // Random initial positions
-  agents.forEach(agent => {
-    const padding = 100;
+  // Random initial positions with padding
+  const padding = 150;
+  agents.forEach((agent, index) => {
+    const angle = (index / agents.length) * Math.PI * 2;
+    const radius = Math.min(canvas.width, canvas.height) * 0.3;
+    
     nodePositions[agent.id] = {
-      x: padding + Math.random() * (canvas.width - padding * 2),
-      y: padding + Math.random() * (canvas.height - padding * 2),
-      role: agent.role,
-      vx: (Math.random() - 0.5) * 0.2,
-      vy: (Math.random() - 0.5) * 0.2,
-      breathing: Math.random() * Math.PI * 2
+      x: canvas.width / 2 + Math.cos(angle) * radius,
+      y: canvas.height / 2 + Math.sin(angle) * radius,
+      baseX: canvas.width / 2 + Math.cos(angle) * radius,
+      baseY: canvas.height / 2 + Math.sin(angle) * radius,
+      vx: (Math.random() - 0.5) * 0.3, // Slower movement
+      vy: (Math.random() - 0.5) * 0.3,
+      breathing: Math.random() * Math.PI * 2,
+      agent: agent
     };
   });
 }
 
-function handleMouseDown(e) {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  
-  // Check if clicking on a node
-  for (const [id, pos] of Object.entries(nodePositions)) {
-    const dx = x - pos.x;
-    const dy = y - pos.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist < 20) {
-      draggedNode = id;
-      canvas.style.cursor = 'grabbing';
+function updateNodePositions() {
+  // Sync with latest agent data
+  agents.forEach(agent => {
+    if (!nodePositions[agent.id]) {
+      // New agent, add to positions
+      const padding = 150;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.min(canvas.width, canvas.height) * 0.3;
       
-      // Show agent details
-      showAgentDetails(id);
-      break;
+      nodePositions[agent.id] = {
+        x: canvas.width / 2 + Math.cos(angle) * radius,
+        y: canvas.height / 2 + Math.sin(angle) * radius,
+        baseX: canvas.width / 2 + Math.cos(angle) * radius,
+        baseY: canvas.height / 2 + Math.sin(angle) * radius,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        breathing: Math.random() * Math.PI * 2,
+        agent: agent
+      };
+    } else {
+      // Update agent data
+      nodePositions[agent.id].agent = agent;
     }
-  }
+  });
+  
+  // Remove agents that no longer exist
+  Object.keys(nodePositions).forEach(id => {
+    if (!agents.find(a => a.id === id)) {
+      delete nodePositions[id];
+    }
+  });
 }
 
 function handleMouseMove(e) {
-  if (!draggedNode) return;
-  
   const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  mousePos.x = e.clientX - rect.left;
+  mousePos.y = e.clientY - rect.top;
   
-  // Update node position
-  nodePositions[draggedNode].x = x;
-  nodePositions[draggedNode].y = y;
+  // Check if hovering over a node
+  hoveredNode = null;
+  canvas.style.cursor = 'default';
   
-  drawSwarm();
+  for (const [id, pos] of Object.entries(nodePositions)) {
+    const dx = mousePos.x - pos.x;
+    const dy = mousePos.y - pos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 25) { // Hit detection radius
+      hoveredNode = id;
+      canvas.style.cursor = 'pointer';
+      break;
+    }
+  }
+  
+  // Dragging
+  if (draggedNode && nodePositions[draggedNode]) {
+    nodePositions[draggedNode].x = mousePos.x;
+    nodePositions[draggedNode].y = mousePos.y;
+    canvas.style.cursor = 'grabbing';
+  }
+}
+
+function handleMouseDown(e) {
+  if (hoveredNode) {
+    draggedNode = hoveredNode;
+    canvas.style.cursor = 'grabbing';
+  }
 }
 
 function handleMouseUp() {
   draggedNode = null;
   if (canvas) {
-    canvas.style.cursor = 'grab';
+    canvas.style.cursor = hoveredNode ? 'pointer' : 'default';
+  }
+}
+
+function handleMouseLeave() {
+  hoveredNode = null;
+  draggedNode = null;
+  if (canvas) {
+    canvas.style.cursor = 'default';
   }
 }
 
 function handleTouchStart(e) {
   e.preventDefault();
   const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousedown', {
+  const mouseEvent = new MouseEvent('mousemove', {
     clientX: touch.clientX,
     clientY: touch.clientY
   });
-  handleMouseDown(mouseEvent);
+  handleMouseMove(mouseEvent);
 }
 
 function handleTouchMove(e) {
@@ -338,7 +390,7 @@ function handleTouchMove(e) {
   handleMouseMove(mouseEvent);
 }
 
-function drawSwarm() {
+function animateSwarm() {
   if (!ctx || !canvas) return;
   
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -348,20 +400,26 @@ function drawSwarm() {
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('暂无 Agent', canvas.width / 2, canvas.height / 2);
-    return;
+  } else {
+    drawSwarm();
   }
   
-  // Initialize positions if needed
-  if (Object.keys(nodePositions).length === 0) {
-    initializeNodePositions();
-  }
-  
+  requestAnimationFrame(animateSwarm);
+}
+
+function drawSwarm() {
   // Update positions
-  Object.values(nodePositions).forEach(pos => {
-    if (pos !== draggedNode) {
+  Object.entries(nodePositions).forEach(([id, pos]) => {
+    // Stop movement if hovered or dragged
+    if (id !== hoveredNode && id !== draggedNode) {
       pos.x += pos.vx;
       pos.y += pos.vy;
-      pos.breathing += 0.05;
+      
+      // Slow breathing (only when working)
+      const isWorking = pos.agent?.status === 'working' || pos.agent?.status === 'busy';
+      if (isWorking) {
+        pos.breathing += 0.02; // Slower breathing frequency
+      }
       
       // Boundary check with bounce
       if (pos.x < 50 || pos.x > canvas.width - 50) pos.vx *= -1;
@@ -378,8 +436,8 @@ function drawSwarm() {
       const [id2, pos2] = positions[j];
       
       const gradient = ctx.createLinearGradient(pos1.x, pos1.y, pos2.x, pos2.y);
-      gradient.addColorStop(0, getRoleColor(pos1.role) + '60');
-      gradient.addColorStop(1, getRoleColor(pos2.role) + '20');
+      gradient.addColorStop(0, getRoleColor(pos1.agent?.role) + '60');
+      gradient.addColorStop(1, getRoleColor(pos2.agent?.role) + '20');
       
       ctx.beginPath();
       ctx.moveTo(pos1.x, pos1.y);
@@ -391,35 +449,39 @@ function drawSwarm() {
   
   // Draw nodes
   positions.forEach(([id, pos]) => {
-    // Breathing effect
-    const breath = Math.sin(pos.breathing) * 3;
-    const baseRadius = 15;
+    const isHovered = id === hoveredNode;
+    const isDragged = id === draggedNode;
+    
+    // Breathing effect (only when working)
+    const isWorking = pos.agent?.status === 'working' || pos.agent?.status === 'busy';
+    const breath = isWorking ? Math.sin(pos.breathing) * 3 : 0;
+    const baseRadius = isHovered || isDragged ? 20 : 15;
     const radius = baseRadius + breath;
     
-    // Draw ripple if agent is working (breathing strongly)
-    if (Math.abs(breath) > 2) {
-      const rippleRadius = radius + 10 + Math.sin(pos.breathing * 2) * 5;
+    // Draw ripple if working
+    if (isWorking) {
+      const rippleRadius = radius + 15 + Math.sin(pos.breathing * 2) * 5;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = getRoleColor(pos.role) + '40';
+      ctx.strokeStyle = getRoleColor(pos.agent?.role) + '30';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
     
     // Draw outer glow
-    const gradient = ctx.createRadialGradient(pos.x, pos.y, radius * 0.5, pos.x, pos.y, radius * 2);
-    gradient.addColorStop(0, getRoleColor(pos.role) + '80');
-    gradient.addColorStop(1, getRoleColor(pos.role) + '00');
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, radius * 0.5, pos.x, pos.y, radius * 2.5);
+    gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '80');
+    gradient.addColorStop(1, getRoleColor(pos.agent?.role) + '00');
     
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, radius * 2, 0, Math.PI * 2);
+    ctx.arc(pos.x, pos.y, radius * 2.5, 0, Math.PI * 2);
     ctx.fillStyle = gradient;
     ctx.fill();
     
     // Draw node
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = getRoleColor(pos.role);
+    ctx.fillStyle = getRoleColor(pos.agent?.role);
     ctx.fill();
     
     // Draw highlight
@@ -427,9 +489,68 @@ function drawSwarm() {
     ctx.arc(pos.x - radius * 0.3, pos.y - radius * 0.3, radius * 0.3, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.fill();
+    
+    // Draw hover effect
+    if (isHovered) {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Draw tooltip
+      drawTooltip(pos, pos.agent);
+    }
   });
+}
+
+function drawTooltip(pos, agent) {
+  if (!agent) return;
   
-  requestAnimationFrame(drawSwarm);
+  const tooltipWidth = 200;
+  const tooltipHeight = 120;
+  let tooltipX = pos.x + 30;
+  let tooltipY = pos.y - tooltipHeight / 2;
+  
+  // Keep tooltip within canvas
+  if (tooltipX + tooltipWidth > canvas.width) {
+    tooltipX = pos.x - tooltipWidth - 30;
+  }
+  if (tooltipY < 10) {
+    tooltipY = 10;
+  }
+  if (tooltipY + tooltipHeight > canvas.height) {
+    tooltipY = canvas.height - tooltipHeight - 10;
+  }
+  
+  // Background
+  ctx.fillStyle = 'rgba(10, 10, 10, 0.95)';
+  ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+  ctx.lineWidth = 1;
+  
+  ctx.beginPath();
+  ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
+  ctx.fill();
+  ctx.stroke();
+  
+  // Content
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillText(agent.id, tooltipX + 15, tooltipY + 25);
+  
+  ctx.fillStyle = getRoleColor(agent.role);
+  ctx.font = '11px sans-serif';
+  ctx.fillText(agent.role, tooltipX + 15, tooltipY + 45);
+  
+  ctx.fillStyle = '#888888';
+  ctx.fillText(`状态：${agent.status || 'idle'}`, tooltipX + 15, tooltipY + 70);
+  
+  const lastActive = agent.lastHeartbeat ? formatTime(new Date(agent.lastHeartbeat).toISOString()) : '-';
+  ctx.fillText(`最后活跃：${lastActive}`, tooltipX + 15, tooltipY + 90);
+  
+  ctx.fillStyle = '#666666';
+  ctx.font = '10px sans-serif';
+  ctx.fillText('点击查看详情', tooltipX + 15, tooltipY + 110);
 }
 
 function getRoleColor(role) {
@@ -560,4 +681,20 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Add roundRect polyfill for Canvas
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    this.beginPath();
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r);
+    this.arcTo(x, y + h, x, y, r);
+    this.arcTo(x, y, x + w, y, r);
+    this.closePath();
+    return this;
+  };
 }
