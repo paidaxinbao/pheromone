@@ -1,33 +1,42 @@
 /**
- * Pheromone Dashboard v2.1
- * Real-time monitoring and management
- * Fixed: UTF-8 encoding and time display
+ * Pheromone Dashboard v3.0
+ * 蜂群可视化 + 双模式切换 + 队列式消息
+ * Created by Fancy (幻彩) - Frontend Expert Agent
  */
 
 const API_BASE = 'http://localhost:18888';
 const UPDATE_INTERVAL = 10000; // 10 seconds
 
-// Charts instances
+// State
+let currentMode = 'simple'; // 'simple' or 'complex'
+let showVisualization = false;
+let agents = [];
+let messages = [];
+let lastMessageId = null;
+
+// Canvas Visualization
+let canvas, ctx;
+let animationFrame;
+let nodes = [];
+let connections = [];
+
+// Charts
 let agentRoleChart = null;
 let messageTypeChart = null;
 let activityTrendChart = null;
-
-// Data storage
-let allMessages = [];
-let currentFilter = 'all';
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v2.1 initialized');
+  console.log('🐜 Pheromone Dashboard v3.0 initialized by Fancy');
   
-  // Set proper encoding
-  document.charset = 'UTF-8';
-  
-  // Initialize charts
+  // Initialize charts (complex mode)
   initCharts();
+  
+  // Initialize canvas (visualization)
+  initCanvas();
   
   // Initial update
   updateDashboard();
@@ -35,103 +44,183 @@ document.addEventListener('DOMContentLoaded', () => {
   // Periodic updates
   setInterval(updateDashboard, UPDATE_INTERVAL);
   
-  // Real-time message updates
-  setInterval(fetchMessages, 5000);
+  // Real-time message updates (queue-style, no refresh)
+  setInterval(fetchNewMessages, 3000);
+  
+  // Animation loop
+  animate();
 });
 
 // ============================================================================
-// Chart Initialization
+// Mode Toggle
 // ============================================================================
 
-function initCharts() {
-  // Agent Role Chart
-  const roleCtx = document.getElementById('agent-role-chart').getContext('2d');
-  agentRoleChart = new Chart(roleCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Manager', 'Developer', 'Reviewer', 'Tester'],
-      datasets: [{
-        data: [0, 0, 0, 0],
-        backgroundColor: ['#ff6b6b', '#00d9ff', '#00ff88', '#ffa502']
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: '#e4e4e4' }
-        }
-      }
-    }
-  });
+function toggleMode() {
+  currentMode = currentMode === 'simple' ? 'complex' : 'simple';
   
-  // Message Type Chart
-  const typeCtx = document.getElementById('message-type-chart').getContext('2d');
-  messageTypeChart = new Chart(typeCtx, {
-    type: 'bar',
-    data: {
-      labels: ['Direct', 'Broadcast', 'Task', 'Update'],
-      datasets: [{
-        label: '消息数量',
-        data: [0, 0, 0, 0],
-        backgroundColor: 'rgba(102, 126, 234, 0.6)',
-        borderColor: 'rgba(102, 126, 234, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { color: '#888' },
-          grid: { color: 'rgba(255,255,255,0.1)' }
-        },
-        x: {
-          ticks: { color: '#888' },
-          grid: { display: false }
-        }
-      },
-      plugins: {
-        legend: { display: false }
-      }
-    }
-  });
+  const simpleMode = document.getElementById('simple-mode');
+  const complexMode = document.getElementById('complex-mode');
+  const modeBtn = document.getElementById('mode-toggle');
   
-  // Activity Trend Chart
-  const trendCtx = document.getElementById('activity-trend-chart').getContext('2d');
-  activityTrendChart = new Chart(trendCtx, {
-    type: 'line',
-    data: {
-      labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-      datasets: [{
-        label: '活动量',
-        data: [0, 0, 0, 0, 0, 0],
-        borderColor: '#00ff88',
-        backgroundColor: 'rgba(0, 255, 136, 0.1)',
-        fill: true,
-        tension: 0.4
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { color: '#888' },
-          grid: { color: 'rgba(255,255,255,0.1)' }
-        },
-        x: {
-          ticks: { color: '#888' },
-          grid: { display: false }
-        }
-      },
-      plugins: {
-        legend: { display: false }
-      }
+  if (currentMode === 'simple') {
+    simpleMode.style.display = 'block';
+    complexMode.style.display = 'none';
+    modeBtn.querySelector('.mode-text').textContent = '简约模式';
+    modeBtn.querySelector('.mode-icon').textContent = '🔍';
+  } else {
+    simpleMode.style.display = 'none';
+    complexMode.style.display = 'block';
+    modeBtn.querySelector('.mode-text').textContent = '复杂模式';
+    modeBtn.querySelector('.mode-icon').textContent = '📊';
+    updateCharts();
+  }
+  
+  console.log(`[Fancy] Switched to ${currentMode} mode`);
+}
+
+function toggleVisualization() {
+  showVisualization = !showVisualization;
+  const vizBtn = document.getElementById('visual-toggle');
+  
+  if (showVisualization) {
+    // Switch to complex mode if in simple mode
+    if (currentMode === 'simple') {
+      toggleMode();
     }
+    vizBtn.querySelector('.visual-text').textContent = '隐藏蜂群';
+    vizBtn.querySelector('.visual-icon').textContent = '🕸️';
+    resizeCanvas();
+  } else {
+    vizBtn.querySelector('.visual-text').textContent = '显示蜂群';
+    vizBtn.querySelector('.visual-icon').textContent = '👁️';
+  }
+}
+
+// ============================================================================
+// Canvas Visualization (Swarm)
+// ============================================================================
+
+function initCanvas() {
+  canvas = document.getElementById('swarm-canvas');
+  if (!canvas) return;
+  
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+}
+
+function resizeCanvas() {
+  if (!canvas) return;
+  const container = canvas.parentElement;
+  canvas.width = container.offsetWidth;
+  canvas.height = container.offsetHeight;
+}
+
+function updateNodes() {
+  // Create nodes from agents
+  nodes = agents.map((agent, index) => {
+    const angle = (index / agents.length) * Math.PI * 2;
+    const radius = Math.min(canvas.width, canvas.height) * 0.35;
+    return {
+      id: agent.id,
+      role: agent.role,
+      x: canvas.width / 2 + Math.cos(angle) * radius,
+      y: canvas.height / 2 + Math.sin(angle) * radius,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
+      pulse: Math.random() * Math.PI * 2
+    };
   });
+}
+
+function drawNodes() {
+  nodes.forEach(node => {
+    // Pulse animation
+    node.pulse += 0.05;
+    const pulseRadius = 25 + Math.sin(node.pulse) * 5;
+    
+    // Draw pulse ring
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, pulseRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = getRoleColor(node.role);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Draw node
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, 20, 0, Math.PI * 2);
+    ctx.fillStyle = getRoleColor(node.role);
+    ctx.fill();
+    
+    // Draw label
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(node.id, node.x, node.y + 35);
+    
+    // Gentle movement
+    node.x += node.vx;
+    node.y += node.vy;
+    
+    // Boundary check
+    const margin = 50;
+    if (node.x < margin || node.x > canvas.width - margin) node.vx *= -1;
+    if (node.y < margin || node.y > canvas.height - margin) node.vy *= -1;
+  });
+}
+
+function drawConnections() {
+  // Draw connections between all nodes (represents potential communication)
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const from = nodes[i];
+      const to = nodes[j];
+      
+      const gradient = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
+      gradient.addColorStop(0, `${getRoleColor(from.role)}80`);
+      gradient.addColorStop(1, `${getRoleColor(to.role)}20`);
+      
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+}
+
+function animate() {
+  if (!showVisualization || !ctx) {
+    animationFrame = requestAnimationFrame(animate);
+    return;
+  }
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  drawConnections();
+  drawNodes();
+  
+  animationFrame = requestAnimationFrame(animate);
+}
+
+function getRoleColor(role) {
+  const colors = {
+    manager: '#ff6b6b',
+    developer: '#00d9ff',
+    reviewer: '#00ff88',
+    tester: '#ffa502'
+  };
+  return colors[role] || '#888';
+}
+
+function resetView() {
+  updateNodes();
+}
+
+function toggleConnections() {
+  // Toggle connection visibility (can be enhanced)
+  console.log('Toggle connections');
 }
 
 // ============================================================================
@@ -143,9 +232,12 @@ async function updateDashboard() {
     await Promise.all([
       updateHubStatus(),
       updateAgents(),
-      updateCharts(),
       fetchMessages()
     ]);
+    
+    if (currentMode === 'complex') {
+      await updateCharts();
+    }
     
     updateLastUpdate();
     document.getElementById('connection-status').className = 'status-indicator status-online';
@@ -159,6 +251,13 @@ async function updateDashboard() {
 async function updateHubStatus() {
   const health = await fetch(`${API_BASE}/health`).then(r => r.json());
   
+  // Simple mode
+  document.getElementById('simple-hub-status').textContent = '在线';
+  document.getElementById('simple-hub-status').className = 'stat-value status-online';
+  document.getElementById('simple-agents').textContent = health.agents;
+  document.getElementById('simple-messages').textContent = health.messages;
+  
+  // Complex mode
   document.getElementById('hub-status').textContent = '在线';
   document.getElementById('hub-status').className = 'value status-online';
   document.getElementById('hub-uptime').textContent = formatUptime(health.uptime);
@@ -167,44 +266,77 @@ async function updateHubStatus() {
 }
 
 async function updateAgents() {
-  const agents = await fetch(`${API_BASE}/agents`).then(r => r.json());
-  renderAgents(agents.agents || []);
+  const data = await fetch(`${API_BASE}/agents`).then(r => r.json());
+  agents = data.agents || [];
+  
+  renderSimpleAgents(agents);
+  renderAgents(agents);
+  updateNodes(); // Update visualization
 }
 
-async function updateCharts() {
-  const [agents, messages] = await Promise.all([
-    fetch(`${API_BASE}/agents`).then(r => r.json()),
-    fetch(`${API_BASE}/messages/history?limit=100`).then(r => r.json())
-  ]);
+async function fetchMessages() {
+  const data = await fetch(`${API_BASE}/messages/history?limit=50`).then(r => r.json());
+  messages = data.messages || [];
   
-  // Update Agent Role Chart
-  const roleCount = { manager: 0, developer: 0, reviewer: 0, tester: 0 };
-  (agents.agents || []).forEach(agent => {
-    if (roleCount[agent.role] !== undefined) {
-      roleCount[agent.role]++;
-    }
-  });
-  agentRoleChart.data.datasets[0].data = Object.values(roleCount);
-  agentRoleChart.update();
+  renderSimpleMessages(messages.slice(0, 10));
+}
+
+async function fetchNewMessages() {
+  const data = await fetch(`${API_BASE}/messages/history?limit=10`).then(r => r.json());
+  const newMessages = data.messages || [];
   
-  // Update Message Type Chart
-  const typeCount = { direct: 0, broadcast: 0, task: 0, update: 0 };
-  (messages.messages || []).forEach(msg => {
-    if (msg.type.includes('direct')) typeCount.direct++;
-    else if (msg.type.includes('broadcast')) typeCount.broadcast++;
-    else if (msg.type.includes('assign')) typeCount.task++;
-    else if (msg.type.includes('update')) typeCount.update++;
+  // Queue-style: add new messages one by one
+  newMessages.forEach((msg, index) => {
+    setTimeout(() => {
+      addMessageToQueue(msg);
+    }, index * 200); // Staggered animation
   });
-  messageTypeChart.data.datasets[0].data = Object.values(typeCount);
-  messageTypeChart.update();
+}
+
+function addMessageToQueue(msg) {
+  const log = document.getElementById('message-log');
+  if (!log) return;
+  
+  // Check if message already exists
+  if (document.getElementById(`msg-${msg.id}`)) return;
+  
+  const item = document.createElement('div');
+  item.className = 'message-item';
+  item.id = `msg-${msg.id}`;
+  item.innerHTML = renderMessage(msg);
+  
+  log.insertBefore(item, log.firstChild);
+  
+  // Keep only 50 messages
+  if (log.children.length > 50) {
+    log.removeChild(log.lastChild);
+  }
 }
 
 // ============================================================================
 // Rendering
 // ============================================================================
 
+function renderSimpleAgents(agents) {
+  const list = document.getElementById('simple-agents-list');
+  if (!list) return;
+  
+  if (!agents || agents.length === 0) {
+    list.innerHTML = '<p class="empty">暂无 Agent</p>';
+    return;
+  }
+  
+  list.innerHTML = agents.map(agent => `
+    <div class="simple-agent-item">
+      <span>${agent.id}</span>
+      <span class="stat-value" style="font-size: 0.8em;">${agent.role}</span>
+    </div>
+  `).join('');
+}
+
 function renderAgents(agents) {
   const grid = document.getElementById('agent-grid');
+  if (!grid) return;
   
   if (!agents || agents.length === 0) {
     grid.innerHTML = '<p class="empty">暂无 Agent</p>';
@@ -244,44 +376,175 @@ function renderAgents(agents) {
   `).join('');
 }
 
-async function fetchMessages() {
-  const messages = await fetch(`${API_BASE}/messages/history?limit=50`).then(r => r.json());
-  allMessages = messages.messages || [];
-  renderMessages(allMessages);
-}
-
-function renderMessages(messages) {
-  const log = document.getElementById('message-log');
+function renderSimpleMessages(messages) {
+  const list = document.getElementById('simple-messages-list');
+  if (!list) return;
   
   if (!messages || messages.length === 0) {
-    log.innerHTML = '<p class="empty">暂无消息</p>';
+    list.innerHTML = '<p class="empty">暂无消息</p>';
     return;
   }
   
-  log.innerHTML = messages.map(msg => {
-    const typeLabel = msg.type.replace('.', ' ');
-    const time = formatLocalTime(msg.timestamp);
-    const content = msg.payload?.content || msg.payload?.title || JSON.stringify(msg.payload);
-    
-    return `
-      <div class="message-item" data-type="${msg.type}">
-        <div class="message-header">
-          <span class="message-type">${typeLabel}</span>
-          <span class="message-time">${time}</span>
-        </div>
-        <div class="message-body">
-          <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong> 
-          ${msg.recipient?.id ? `→ <strong>${escapeHtml(msg.recipient.id)}</strong>` : '→ 📢 广播'}
-          <br>
-          ${msg.payload?.subject ? `<em>${escapeHtml(msg.payload.subject)}</em><br>` : ''}
-          ${escapeHtml(content)}
-        </div>
-        <div class="message-sender">
-          ID: ${escapeHtml(msg.id)} | 优先级：${escapeHtml(msg.metadata?.priority || 'normal')}
-        </div>
+  list.innerHTML = messages.map(msg => `
+    <div class="simple-message-item">
+      <div style="font-weight: 600; margin-bottom: 5px;">
+        ${msg.sender?.id || 'unknown'} 
+        ${msg.recipient?.id ? `→ ${msg.recipient.id}` : '→ 📢'}
       </div>
-    `;
-  }).join('');
+      <div style="font-size: 0.85em; color: #888;">
+        ${msg.payload?.subject || msg.payload?.title || '无主题'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderMessage(msg) {
+  const typeLabel = msg.type.replace('.', ' ');
+  const time = formatLocalTime(msg.timestamp);
+  const content = msg.payload?.content || msg.payload?.title || JSON.stringify(msg.payload);
+  
+  return `
+    <div class="message-header">
+      <span class="message-type">${typeLabel}</span>
+      <span class="message-time">${time}</span>
+    </div>
+    <div class="message-body">
+      <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong> 
+      ${msg.recipient?.id ? `→ <strong>${escapeHtml(msg.recipient.id)}</strong>` : '→ 📢 广播'}
+      <br>
+      ${msg.payload?.subject ? `<em>${escapeHtml(msg.payload.subject)}</em><br>` : ''}
+      ${escapeHtml(content)}
+    </div>
+    <div class="message-sender">
+      ID: ${escapeHtml(msg.id)} | 优先级：${escapeHtml(msg.metadata?.priority || 'normal')}
+    </div>
+  `;
+}
+
+// ============================================================================
+// Charts (Complex Mode)
+// ============================================================================
+
+function initCharts() {
+  // Agent Role Chart
+  const roleCtx = document.getElementById('agent-role-chart')?.getContext('2d');
+  if (roleCtx) {
+    agentRoleChart = new Chart(roleCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Manager', 'Developer', 'Reviewer', 'Tester'],
+        datasets: [{
+          data: [0, 0, 0, 0],
+          backgroundColor: ['#ff6b6b', '#00d9ff', '#00ff88', '#ffa502']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#e4e4e4' }
+          }
+        }
+      }
+    });
+  }
+  
+  // Message Type Chart
+  const typeCtx = document.getElementById('message-type-chart')?.getContext('2d');
+  if (typeCtx) {
+    messageTypeChart = new Chart(typeCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Direct', 'Broadcast', 'Task', 'Update'],
+        datasets: [{
+          label: '消息数量',
+          data: [0, 0, 0, 0],
+          backgroundColor: 'rgba(102, 126, 234, 0.6)',
+          borderColor: 'rgba(102, 126, 234, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#888' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          x: {
+            ticks: { color: '#888' },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+  
+  // Activity Trend Chart
+  const trendCtx = document.getElementById('activity-trend-chart')?.getContext('2d');
+  if (trendCtx) {
+    activityTrendChart = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+        datasets: [{
+          label: '活动量',
+          data: [0, 0, 0, 0, 0, 0],
+          borderColor: '#00ff88',
+          backgroundColor: 'rgba(0, 255, 136, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#888' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          },
+          x: {
+            ticks: { color: '#888' },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+}
+
+async function updateCharts() {
+  if (!agentRoleChart || !messageTypeChart) return;
+  
+  // Update Agent Role Chart
+  const roleCount = { manager: 0, developer: 0, reviewer: 0, tester: 0 };
+  agents.forEach(agent => {
+    if (roleCount[agent.role] !== undefined) {
+      roleCount[agent.role]++;
+    }
+  });
+  agentRoleChart.data.datasets[0].data = Object.values(roleCount);
+  agentRoleChart.update();
+  
+  // Update Message Type Chart
+  const typeCount = { direct: 0, broadcast: 0, task: 0, update: 0 };
+  messages.forEach(msg => {
+    if (msg.type.includes('direct')) typeCount.direct++;
+    else if (msg.type.includes('broadcast')) typeCount.broadcast++;
+    else if (msg.type.includes('assign')) typeCount.task++;
+    else if (msg.type.includes('update')) typeCount.update++;
+  });
+  messageTypeChart.data.datasets[0].data = Object.values(typeCount);
+  messageTypeChart.update();
 }
 
 // ============================================================================
@@ -321,38 +584,127 @@ function searchMessages() {
 }
 
 // ============================================================================
-// Quick Actions
+// Modal (HeroUI Style)
+// ============================================================================
+
+function openModal(title, content, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = content;
+  document.getElementById('modal-overlay').classList.add('active');
+  
+  window.currentModalConfirm = onConfirm;
+}
+
+function closeModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('modal-overlay').classList.remove('active');
+  window.currentModalConfirm = null;
+}
+
+function confirmModal() {
+  if (window.currentModalConfirm) {
+    window.currentModalConfirm();
+  }
+  closeModal();
+}
+
+// ============================================================================
+// Quick Actions (Enhanced Modals)
 // ============================================================================
 
 function createAgent() {
-  const id = prompt('Agent ID:');
-  const role = prompt('Agent Role (developer/reviewer/tester):');
-  if (id && role) {
-    alert(`[牢张] 正在创建 Agent: ${id} (${role})...`);
-  }
+  const content = `
+    <div style="display: grid; gap: 15px;">
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">Agent ID</label>
+        <input type="text" id="new-agent-id" placeholder="例如：dev-team-1" 
+               style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4;">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">角色</label>
+        <select id="new-agent-role" 
+                style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4;">
+          <option value="developer">Developer</option>
+          <option value="reviewer">Reviewer</option>
+          <option value="tester">Tester</option>
+          <option value="manager">Manager</option>
+        </select>
+      </div>
+    </div>
+  `;
+  
+  openModal('➕ 创建 Agent', content, () => {
+    const id = document.getElementById('new-agent-id').value;
+    const role = document.getElementById('new-agent-role').value;
+    if (id && role) {
+      alert(`[牢张] 正在创建 Agent: ${id} (${role})...`);
+      // API call would go here
+    }
+  });
 }
 
 function assignTask() {
-  const agentId = prompt('目标 Agent ID:');
-  const title = prompt('任务标题:');
-  const desc = prompt('任务描述:');
-  if (agentId && title) {
-    alert(`[福瑞] 任务已分配给 ${agentId}，交给我吧！`);
-  }
+  const content = `
+    <div style="display: grid; gap: 15px;">
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">目标 Agent</label>
+        <input type="text" id="task-agent-id" placeholder="例如：dev-team-1" 
+               style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4;">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">任务标题</label>
+        <input type="text" id="task-title" placeholder="例如：实现用户模块" 
+               style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4;">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">任务描述</label>
+        <textarea id="task-desc" placeholder="详细描述任务内容..." rows="3"
+                  style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4; resize: vertical;"></textarea>
+      </div>
+    </div>
+  `;
+  
+  openModal('📋 分配任务', content, () => {
+    const agentId = document.getElementById('task-agent-id').value;
+    const title = document.getElementById('task-title').value;
+    const desc = document.getElementById('task-desc').value;
+    if (agentId && title) {
+      alert(`[福瑞] 任务已分配给 ${agentId}，交给我吧！`);
+      // API call would go here
+    }
+  });
 }
 
 function broadcastMessage() {
-  const subject = prompt('广播主题:');
-  const content = prompt('广播内容:');
-  if (subject && content) {
-    alert(`[福瑞] 广播已发送！所有 Agent 都会收到。`);
-  }
+  const content = `
+    <div style="display: grid; gap: 15px;">
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">广播主题</label>
+        <input type="text" id="broadcast-subject" placeholder="例如：项目更新" 
+               style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4;">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">广播内容</label>
+        <textarea id="broadcast-content" placeholder="输入广播内容..." rows="4"
+                  style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e4e4e4; resize: vertical;"></textarea>
+      </div>
+    </div>
+  `;
+  
+  openModal('📢 广播消息', content, () => {
+    const subject = document.getElementById('broadcast-subject').value;
+    const content = document.getElementById('broadcast-content').value;
+    if (subject && content) {
+      alert(`[福瑞] 广播已发送！所有 Agent 都会收到。`);
+      // API call would go here
+    }
+  });
 }
 
 function exportData() {
   const data = {
-    agents: document.getElementById('hub-agents').textContent,
-    messages: document.getElementById('hub-messages').textContent,
+    agents: agents.length,
+    messages: messages.length,
     timestamp: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -367,16 +719,6 @@ function exportData() {
 // ============================================================================
 // Utilities
 // ============================================================================
-
-function getRoleColor(role) {
-  const colors = {
-    manager: '#ff6b6b',
-    developer: '#00d9ff',
-    reviewer: '#00ff88',
-    tester: '#ffa502'
-  };
-  return colors[role] || '#888';
-}
 
 function formatUptime(seconds) {
   const h = Math.floor(seconds / 3600);
