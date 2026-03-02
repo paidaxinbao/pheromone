@@ -1,6 +1,6 @@
 /**
- * Pheromone Dashboard v3.6
- * Fixed Swarm Visualization - Accurate Hit Detection + Landing Page Breathing Effect
+ * Pheromone Dashboard v3.7
+ * Minimalist Breathing Dot Style (like "在线" indicator)
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -20,7 +20,7 @@ let animationFrameId = null;
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v3.6 initialized');
+  console.log('🐜 Pheromone Dashboard v3.7 initialized');
   
   // Initial data fetch
   updateDashboard();
@@ -226,7 +226,7 @@ function renderMessage(msg) {
 }
 
 // ============================================================================
-// Interactive Swarm Visualization (FIXED - Accurate Hit Detection)
+// Interactive Swarm Visualization (Minimalist Breathing Dot Style)
 // ============================================================================
 
 function initCanvas() {
@@ -437,8 +437,8 @@ function drawSwarm() {
       pos.x += pos.vx;
       pos.y += pos.vy;
       
-      // Breathing animation (like landing page - slow and smooth)
-      pos.breathing += 0.015;
+      // Breathing animation (like "在线" indicator - slow pulse)
+      pos.breathing += 0.02;
       
       // Boundary check with bounce
       if (pos.x < 50 || pos.x > canvas.width - 50) pos.vx *= -1;
@@ -446,72 +446,65 @@ function drawSwarm() {
     }
   });
   
-  // Draw connections (workflow-style, thicker lines)
-  ctx.lineWidth = 3;
+  // Draw connections (thin lines)
+  ctx.lineWidth = 1;
   const positions = Object.entries(nodePositions);
   for (let i = 0; i < positions.length; i++) {
     for (let j = i + 1; j < positions.length; j++) {
       const [id1, pos1] = positions[i];
       const [id2, pos2] = positions[j];
       
-      const gradient = ctx.createLinearGradient(pos1.x, pos1.y, pos2.x, pos2.y);
-      gradient.addColorStop(0, getRoleColor(pos1.agent?.role) + '60');
-      gradient.addColorStop(1, getRoleColor(pos2.agent?.role) + '20');
-      
       ctx.beginPath();
       ctx.moveTo(pos1.x, pos1.y);
       ctx.lineTo(pos2.x, pos2.y);
-      ctx.strokeStyle = gradient;
+      ctx.strokeStyle = getRoleColor(pos1.agent?.role) + '30';
       ctx.stroke();
     }
   }
   
-  // Draw nodes
+  // Draw nodes (Minimalist Breathing Dot Style)
   positions.forEach(([id, pos]) => {
     const isHovered = id === hoveredNode;
     const isDragged = id === draggedNode;
     
-    // Breathing effect (like landing page - always breathing, slower)
-    const breath = Math.sin(pos.breathing) * 4;
-    const baseRadius = isHovered || isDragged ? 22 : 18;
-    const radius = baseRadius + breath;
+    // Breathing effect (opacity pulse like "在线" indicator)
+    const breath = Math.sin(pos.breathing);
+    const baseOpacity = 0.6;
+    const opacity = baseOpacity + breath * 0.4; // 0.2 - 1.0
     
-    // Draw ripple (like landing page)
-    const rippleRadius = radius + 20 + Math.sin(pos.breathing * 2) * 8;
+    // Draw ripple (concentric circles expanding)
+    const rippleRadius = 15 + breath * 10;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
     ctx.strokeStyle = getRoleColor(pos.agent?.role) + '20';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Draw outer glow (like landing page)
-    const gradient = ctx.createRadialGradient(pos.x, pos.y, radius * 0.5, pos.x, pos.y, radius * 3);
-    gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '60');
+    // Draw outer glow (soft glow)
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 20);
+    gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '40');
     gradient.addColorStop(1, getRoleColor(pos.agent?.role) + '00');
     
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, radius * 3, 0, Math.PI * 2);
+    ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
     ctx.fillStyle = gradient;
     ctx.fill();
     
-    // Draw node
+    // Draw dot (like "在线" indicator - simple circle)
+    const dotRadius = isHovered || isDragged ? 6 : 5;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+    ctx.arc(pos.x, pos.y, dotRadius, 0, Math.PI * 2);
     ctx.fillStyle = getRoleColor(pos.agent?.role);
+    ctx.globalAlpha = opacity;
     ctx.fill();
+    ctx.globalAlpha = 1.0;
     
-    // Draw highlight (like landing page)
-    ctx.beginPath();
-    ctx.arc(pos.x - radius * 0.3, pos.y - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.fill();
-    
-    // Draw hover effect
+    // Draw hover effect (white ring)
     if (isHovered) {
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius + 8, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, dotRadius + 6, 0, Math.PI * 2);
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       
       // Draw tooltip
@@ -525,12 +518,12 @@ function drawTooltip(pos, agent) {
   
   const tooltipWidth = 200;
   const tooltipHeight = 120;
-  let tooltipX = pos.x + 35;
+  let tooltipX = pos.x + 20;
   let tooltipY = pos.y - tooltipHeight / 2;
   
   // Keep tooltip within canvas
   if (tooltipX + tooltipWidth > canvas.width) {
-    tooltipX = pos.x - tooltipWidth - 35;
+    tooltipX = pos.x - tooltipWidth - 20;
   }
   if (tooltipY < 10) {
     tooltipY = 10;
