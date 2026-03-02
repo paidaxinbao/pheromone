@@ -9,39 +9,73 @@
 <body>
   <!-- 着陆页 -->
   <main class="landing-page" id="landing-page">
-    <div class="hero">
-      <h1 class="hero-title">
-        <span class="gradient-text">Pheromone</span>
-        <span class="subtitle">Agent Swarm Dashboard</span>
-      </h1>
-      
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="landing-hub-status">●</div>
-          <div class="stat-label">Hub 状态</div>
+    <div class="landing-content">
+      <div class="hero-section">
+        <div class="hero-badge">Agent Swarm Communication System</div>
+        <h1 class="hero-title">
+          <span class="gradient-text">Pheromone</span>
+        </h1>
+        <p class="hero-description">
+          去中心化 Agent 通信协议<br>
+          实现高效、安全、可扩展的群体智能协作
+        </p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="stat-number" id="landing-agents">0</div>
+            <div class="stat-label">活跃 Agent</div>
+          </div>
+          <div class="hero-stat">
+            <div class="stat-number" id="landing-messages">0</div>
+            <div class="stat-label">消息处理</div>
+          </div>
+          <div class="hero-stat">
+            <div class="stat-number" id="landing-uptime">0h</div>
+            <div class="stat-label">运行时间</div>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value" id="landing-agents">0</div>
-          <div class="stat-label">Agent</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="landing-messages">0</div>
-          <div class="stat-label">消息</div>
+        <div class="cta-buttons">
+          <button class="btn btn-primary btn-large" onclick="enterDashboard()">
+            进入控制台
+            <span class="btn-arrow">→</span>
+          </button>
+          <button class="btn btn-secondary btn-large" onclick="showSwarmFromLanding()">
+            <span class="btn-icon">🕸️</span>
+            查看蜂群
+          </button>
         </div>
       </div>
       
-      <div class="cta-buttons">
-        <button class="btn btn-primary" onclick="enterDashboard()">
-          进入仪表盘
-        </button>
-        <button class="btn btn-secondary" onclick="toggleSwarm()">
-          显示蜂群
-        </button>
+      <div class="features-section">
+        <div class="feature-card">
+          <div class="feature-icon">🔗</div>
+          <h3>去中心化通信</h3>
+          <p>基于信息素的消息路由协议，实现 Agent 间的高效通信</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>安全可靠</h3>
+          <p>消息持久化存储，支持回调确认机制，确保消息可靠送达</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>实时监控</h3>
+          <p>可视化蜂群状态，实时消息流，全面掌握系统运行状态</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>高性能</h3>
+          <p>异步消息处理，支持高并发，低延迟通信</p>
+        </div>
       </div>
     </div>
     
     <footer class="landing-footer">
-      <p>Pheromone Dashboard v3.2</p>
+      <p>Pheromone Dashboard v3.3</p>
+      <p class="footer-links">
+        <a href="https://github.com/paidaxinbao/pheromone" target="_blank">GitHub</a>
+        <span>·</span>
+        <a href="http://localhost:18888/health" target="_blank">API</a>
+      </p>
     </footer>
   </main>
   
@@ -55,7 +89,10 @@
         </h1>
         <div class="header-actions">
           <button class="btn btn-sm" onclick="exitDashboard()">← 返回</button>
-          <button class="btn btn-sm" onclick="toggleSwarm()">🕸️ 蜂群</button>
+          <button class="btn btn-sm btn-icon" onclick="toggleSwarm()">🕸️</button>
+          <button class="btn btn-sm btn-icon" onclick="openCreateAgent()">➕</button>
+          <button class="btn btn-sm btn-icon" onclick="openAssignTask()">📋</button>
+          <button class="btn btn-sm btn-icon" onclick="openBroadcast()">📢</button>
         </div>
       </div>
     </header>
@@ -133,6 +170,21 @@
       </section>
     </div>
   </main>
+  
+  <!-- 弹窗 -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">标题</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+        <button class="btn btn-confirm" onclick="confirmModal()">确认</button>
+      </div>
+    </div>
+  </div>
   
   <script src="app.js"></script>
 </body>

@@ -1,6 +1,6 @@
 /**
- * Pheromone Dashboard v3.2
- * Minimalist Landing Page + Fixed Swarm Visualization
+ * Pheromone Dashboard v3.3
+ * Enhanced Landing Page + Cluster Swarm + Slide-in Messages
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -8,13 +8,14 @@ let agents = [];
 let messages = [];
 let swarmVisible = false;
 let canvas, ctx;
+let currentModalAction = null;
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v3.2 initialized');
+  console.log('🐜 Pheromone Dashboard v3.3 initialized');
   
   // Initial data fetch
   updateDashboard();
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Periodic updates
   setInterval(updateDashboard, 10000);
   
-  // Real-time messages
+  // Real-time messages (queue-style, no refresh)
   setInterval(fetchNewMessages, 3000);
   
   // Initialize canvas
@@ -41,7 +42,17 @@ function enterDashboard() {
 
 function exitDashboard() {
   document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('landing-page').style.display = 'flex';
+  document.getElementById('landing-page').style.display = 'block';
+}
+
+function showSwarmFromLanding() {
+  swarmVisible = true;
+  enterDashboard();
+  setTimeout(() => {
+    document.getElementById('swarm-section').style.display = 'block';
+    resizeCanvas();
+    drawSwarm();
+  }, 300);
 }
 
 function toggleSwarm() {
@@ -50,8 +61,10 @@ function toggleSwarm() {
   section.style.display = swarmVisible ? 'block' : 'none';
   
   if (swarmVisible) {
-    resizeCanvas();
-    drawSwarm();
+    setTimeout(() => {
+      resizeCanvas();
+      drawSwarm();
+    }, 100);
   }
 }
 
@@ -67,10 +80,9 @@ async function updateDashboard() {
     agents = agentsData.agents || [];
     
     // Update landing page
-    document.getElementById('landing-hub-status').textContent = '●';
-    document.getElementById('landing-hub-status').style.color = '#00ff88';
     document.getElementById('landing-agents').textContent = health.agents;
     document.getElementById('landing-messages').textContent = health.messages;
+    document.getElementById('landing-uptime').textContent = formatUptime(health.uptime);
     
     // Update dashboard
     document.getElementById('hub-status').innerHTML = `
@@ -84,6 +96,11 @@ async function updateDashboard() {
     // Update agent list
     renderAgentList(agents);
     
+    // Update message preview
+    if (messages.length > 0) {
+      renderMessagePreview(messages.slice(0, 5));
+    }
+    
     // Update last update time
     document.getElementById('last-update').textContent = `更新于 ${new Date().toLocaleTimeString('zh-CN')}`;
     
@@ -93,17 +110,52 @@ async function updateDashboard() {
     }
   } catch (error) {
     console.error('Update failed:', error);
-    document.getElementById('landing-hub-status').style.color = '#ff4757';
   }
 }
 
 async function fetchNewMessages() {
   try {
-    const data = await fetch(`${API_BASE}/messages/history?limit=10`).then(r => r.json());
-    messages = data.messages || [];
-    renderMessages(messages);
+    const data = await fetch(`${API_BASE}/messages/history?limit=20`).then(r => r.json());
+    const newMessages = data.messages || [];
+    
+    // Check for new messages
+    if (newMessages.length > messages.length) {
+      const addedCount = newMessages.length - messages.length;
+      const newOnes = newMessages.slice(0, addedCount);
+      
+      // Add messages one by one with animation
+      newOnes.forEach((msg, index) => {
+        setTimeout(() => {
+          addMessageToTop(msg);
+        }, index * 150);
+      });
+      
+      messages = newMessages;
+    }
   } catch (error) {
     console.error('Fetch messages failed:', error);
+  }
+}
+
+function addMessageToTop(msg) {
+  const list = document.getElementById('message-list');
+  if (!list) return;
+  
+  // Remove empty message
+  const empty = list.querySelector('.empty');
+  if (empty) empty.remove();
+  
+  const item = document.createElement('div');
+  item.className = 'message-item';
+  item.id = `msg-${msg.id}`;
+  item.innerHTML = renderMessage(msg);
+  
+  // Insert at top
+  list.insertBefore(item, list.firstChild);
+  
+  // Keep only 50 messages
+  if (list.children.length > 50) {
+    list.removeChild(list.lastChild);
   }
 }
 
@@ -116,7 +168,7 @@ function renderAgentList(agents) {
   if (!list) return;
   
   if (!agents || agents.length === 0) {
-    list.innerHTML = '<div class="empty">暂无 Agent</div>';
+    list.innerHTML = '<div class="empty" style="padding: 20px;">暂无 Agent</div>';
     return;
   }
   
@@ -128,51 +180,42 @@ function renderAgentList(agents) {
   `).join('');
 }
 
-function renderMessages(messages) {
-  const list = document.getElementById('message-list');
+function renderMessagePreview(messages) {
   const preview = document.getElementById('message-preview');
-  if (!list && !preview) return;
+  if (!preview) return;
   
-  if (!messages || messages.length === 0) {
-    if (list) list.innerHTML = '<div class="empty">暂无消息</div>';
-    if (preview) preview.innerHTML = '<div class="empty">暂无消息</div>';
-    return;
-  }
+  preview.innerHTML = messages.map(msg => `
+    <div class="message-item-mini">
+      <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong>
+      ${msg.recipient?.id ? `→ ${escapeHtml(msg.recipient.id)}` : '→ 📢'}
+      <br>
+      <small>${escapeHtml(msg.payload?.subject || msg.payload?.title || '无主题')}</small>
+    </div>
+  `).join('');
+}
+
+function renderMessage(msg) {
+  const typeLabel = msg.type.replace('.', ' ');
+  const time = formatTime(msg.timestamp);
+  const content = msg.payload?.content || msg.payload?.title || JSON.stringify(msg.payload);
   
-  // Full list
-  if (list) {
-    list.innerHTML = messages.map(msg => `
-      <div class="message-item">
-        <div class="message-header">
-          <span class="message-type">${msg.type.replace('.', ' ')}</span>
-          <span class="message-time">${formatTime(msg.timestamp)}</span>
-        </div>
-        <div class="message-body">
-          <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong>
-          ${msg.recipient?.id ? ` → ${escapeHtml(msg.recipient.id)}` : ' → 📢'}
-          ${msg.payload?.subject ? `<br><em>${escapeHtml(msg.payload.subject)}</em>` : ''}
-          ${msg.payload?.content ? `<br>${escapeHtml(msg.payload.content)}` : ''}
-        </div>
-        <div class="message-sender">ID: ${msg.id}</div>
-      </div>
-    `).join('');
-  }
-  
-  // Preview (landing page)
-  if (preview) {
-    preview.innerHTML = messages.slice(0, 5).map(msg => `
-      <div class="message-item-mini">
-        <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong>
-        ${msg.recipient?.id ? `→ ${escapeHtml(msg.recipient.id)}` : '→ 📢'}
-        <br>
-        <small>${escapeHtml(msg.payload?.subject || msg.payload?.title || '无主题')}</small>
-      </div>
-    `).join('');
-  }
+  return `
+    <div class="message-header">
+      <span class="message-type">${typeLabel}</span>
+      <span class="message-time">${time}</span>
+    </div>
+    <div class="message-body">
+      <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong>
+      ${msg.recipient?.id ? ` → <strong>${escapeHtml(msg.recipient.id)}</strong>` : ' → 📢 广播'}
+      ${msg.payload?.subject ? `<br><em>${escapeHtml(msg.payload.subject)}</em>` : ''}
+      ${content ? `<br>${escapeHtml(content)}` : ''}
+    </div>
+    <div class="message-sender">ID: ${escapeHtml(msg.id)} | 优先级：${escapeHtml(msg.metadata?.priority || 'normal')}</div>
+  `;
 }
 
 // ============================================================================
-// Swarm Visualization (Fixed Position, Dynamic Size)
+// Swarm Visualization (Cluster by Role, Workflow-style Lines)
 // ============================================================================
 
 function initCanvas() {
@@ -188,7 +231,7 @@ function resizeCanvas() {
   if (!canvas) return;
   const container = canvas.parentElement;
   canvas.width = container.offsetWidth;
-  canvas.height = 400;
+  canvas.height = 500;
 }
 
 function drawSwarm() {
@@ -204,55 +247,79 @@ function drawSwarm() {
     return;
   }
   
-  // Calculate dynamic dot size based on agent count
-  const maxDotSize = 20;
-  const minDotSize = 8;
-  const dotSize = Math.max(minDotSize, maxDotSize - (agents.length * 2));
+  // Group agents by role
+  const groups = {
+    manager: agents.filter(a => a.role === 'manager'),
+    developer: agents.filter(a => a.role === 'developer'),
+    reviewer: agents.filter(a => a.role === 'reviewer'),
+    tester: agents.filter(a => a.role === 'tester')
+  };
   
-  // Calculate grid layout
-  const cols = Math.ceil(Math.sqrt(agents.length));
-  const rows = Math.ceil(agents.length / cols);
-  const cellWidth = canvas.width / cols;
-  const cellHeight = canvas.height / rows;
+  // Calculate cluster positions
+  const clusterPositions = {
+    manager: { x: canvas.width / 2, y: canvas.height * 0.2 },
+    developer: { x: canvas.width * 0.25, y: canvas.height * 0.5 },
+    reviewer: { x: canvas.width * 0.75, y: canvas.height * 0.5 },
+    tester: { x: canvas.width / 2, y: canvas.height * 0.8 }
+  };
   
-  // Draw agents in fixed grid positions
-  agents.forEach((agent, index) => {
-    const col = index % cols;
-    const row = Math.floor(index / cols);
-    const x = col * cellWidth + cellWidth / 2;
-    const y = row * cellHeight + cellHeight / 2;
+  // Calculate node positions within clusters
+  const nodePositions = {};
+  Object.keys(groups).forEach(role => {
+    const group = groups[role];
+    if (group.length === 0) return;
     
-    // Draw connection lines to all other agents
-    for (let j = index + 1; j < agents.length; j++) {
-      const jCol = j % cols;
-      const jRow = Math.floor(j / cols);
-      const jX = jCol * cellWidth + cellWidth / 2;
-      const jY = jRow * cellHeight + cellHeight / 2;
+    const center = clusterPositions[role];
+    const radius = 80;
+    
+    group.forEach((agent, index) => {
+      const angle = (index / group.length) * Math.PI * 2 - Math.PI / 2;
+      nodePositions[agent.id] = {
+        x: center.x + Math.cos(angle) * radius,
+        y: center.y + Math.sin(angle) * radius,
+        role: role
+      };
+    });
+  });
+  
+  // Draw workflow-style connections (thicker lines)
+  ctx.lineWidth = 3;
+  Object.values(nodePositions).forEach((pos1, i) => {
+    Object.values(nodePositions).forEach((pos2, j) => {
+      if (i >= j) return;
+      
+      const gradient = ctx.createLinearGradient(pos1.x, pos1.y, pos2.x, pos2.y);
+      gradient.addColorStop(0, getRoleColor(pos1.role) + '60');
+      gradient.addColorStop(1, getRoleColor(pos2.role) + '20');
       
       ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(jX, jY);
-      ctx.strokeStyle = 'rgba(102, 126, 234, 0.15)';
-      ctx.lineWidth = 1;
+      ctx.moveTo(pos1.x, pos1.y);
+      ctx.lineTo(pos2.x, pos2.y);
+      ctx.strokeStyle = gradient;
       ctx.stroke();
-    }
+    });
+  });
+  
+  // Draw nodes
+  Object.entries(nodePositions).forEach(([id, pos]) => {
+    const dotSize = 15;
     
-    // Draw agent dot
+    // Draw node
     ctx.beginPath();
-    ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-    ctx.fillStyle = getRoleColor(agent.role);
+    ctx.arc(pos.x, pos.y, dotSize, 0, Math.PI * 2);
+    ctx.fillStyle = getRoleColor(pos.role);
     ctx.fill();
     
     // Draw label
     ctx.fillStyle = '#fff';
-    ctx.font = '12px sans-serif';
+    ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(agent.id, x, y + dotSize + 15);
+    ctx.fillText(id, pos.x, pos.y + dotSize + 18);
     
     // Draw role
-    ctx.fillStyle = getRoleColor(agent.role);
+    ctx.fillStyle = getRoleColor(pos.role);
     ctx.font = '10px sans-serif';
-    ctx.fillText(agent.role, x, y + dotSize + 28);
+    ctx.fillText(pos.role, pos.x, pos.y + dotSize + 32);
   });
 }
 
@@ -267,15 +334,117 @@ function getRoleColor(role) {
 }
 
 // ============================================================================
+// Modal Actions
+// ============================================================================
+
+function openModal(title, content, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = content;
+  document.getElementById('modal-overlay').classList.add('active');
+  currentModalAction = onConfirm;
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+  currentModalAction = null;
+}
+
+function confirmModal() {
+  if (currentModalAction) {
+    currentModalAction();
+  }
+  closeModal();
+}
+
+function openCreateAgent() {
+  const content = `
+    <div style="display: grid; gap: 15px;">
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">Agent ID</label>
+        <input type="text" id="new-agent-id" placeholder="例如：dev-team-1">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">角色</label>
+        <select id="new-agent-role">
+          <option value="developer">Developer</option>
+          <option value="reviewer">Reviewer</option>
+          <option value="tester">Tester</option>
+          <option value="manager">Manager</option>
+        </select>
+      </div>
+    </div>
+  `;
+  
+  openModal('➕ 创建 Agent', content, () => {
+    const id = document.getElementById('new-agent-id').value;
+    const role = document.getElementById('new-agent-role').value;
+    if (id && role) {
+      alert(`[牢张] 正在创建 Agent: ${id} (${role})...`);
+      // API call would go here
+    }
+  });
+}
+
+function openAssignTask() {
+  const content = `
+    <div style="display: grid; gap: 15px;">
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">目标 Agent</label>
+        <input type="text" id="task-agent-id" placeholder="例如：dev-team-1">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">任务标题</label>
+        <input type="text" id="task-title" placeholder="例如：实现用户模块">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">任务描述</label>
+        <textarea id="task-desc" placeholder="详细描述任务内容..." rows="3"></textarea>
+      </div>
+    </div>
+  `;
+  
+  openModal('📋 分配任务', content, () => {
+    const agentId = document.getElementById('task-agent-id').value;
+    const title = document.getElementById('task-title').value;
+    const desc = document.getElementById('task-desc').value;
+    if (agentId && title) {
+      alert(`[福瑞] 任务已分配给 ${agentId}，交给我吧！`);
+    }
+  });
+}
+
+function openBroadcast() {
+  const content = `
+    <div style="display: grid; gap: 15px;">
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">广播主题</label>
+        <input type="text" id="broadcast-subject" placeholder="例如：项目更新">
+      </div>
+      <div>
+        <label style="display: block; margin-bottom: 5px; color: #888;">广播内容</label>
+        <textarea id="broadcast-content" placeholder="输入广播内容..." rows="4"></textarea>
+      </div>
+    </div>
+  `;
+  
+  openModal('📢 广播消息', content, () => {
+    const subject = document.getElementById('broadcast-subject').value;
+    const content = document.getElementById('broadcast-content').value;
+    if (subject && content) {
+      alert(`[福瑞] 广播已发送！所有 Agent 都会收到。`);
+    }
+  });
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
 function formatUptime(seconds) {
-  if (!seconds) return '-';
+  if (!seconds) return '0h 0m';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${h}h ${m}m ${s}s`;
+  return `${h}h ${m}m`;
 }
 
 function formatTime(isoString) {
