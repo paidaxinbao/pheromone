@@ -1,6 +1,7 @@
 /**
- * Pheromone Dashboard v2.0
+ * Pheromone Dashboard v2.1
  * Real-time monitoring and management
+ * Fixed: UTF-8 encoding and time display
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -20,7 +21,10 @@ let currentFilter = 'all';
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v2.0 initialized');
+  console.log('🐜 Pheromone Dashboard v2.1 initialized');
+  
+  // Set proper encoding
+  document.charset = 'UTF-8';
   
   // Initialize charts
   initCharts();
@@ -223,11 +227,11 @@ function renderAgents(agents) {
         </div>
         <div class="info-row">
           <span class="label">注册时间</span>
-          <span class="value">${formatTime(agent.registeredAt)}</span>
+          <span class="value">${formatLocalTime(agent.registeredAt)}</span>
         </div>
         <div class="info-row">
           <span class="label">最后心跳</span>
-          <span class="value">${formatTime(new Date(agent.lastHeartbeat).toISOString())}</span>
+          <span class="value">${formatLocalTime(new Date(agent.lastHeartbeat).toISOString())}</span>
         </div>
         ${agent.callbackUrl ? `
         <div class="info-row">
@@ -256,21 +260,24 @@ function renderMessages(messages) {
   
   log.innerHTML = messages.map(msg => {
     const typeLabel = msg.type.replace('.', ' ');
+    const time = formatLocalTime(msg.timestamp);
+    const content = msg.payload?.content || msg.payload?.title || JSON.stringify(msg.payload);
+    
     return `
       <div class="message-item" data-type="${msg.type}">
         <div class="message-header">
           <span class="message-type">${typeLabel}</span>
-          <span class="message-time">${formatTime(msg.timestamp)}</span>
+          <span class="message-time">${time}</span>
         </div>
         <div class="message-body">
-          <strong>${msg.sender?.id}</strong> 
-          ${msg.recipient?.id ? `→ <strong>${msg.recipient.id}</strong>` : '→ 📢 广播'}
+          <strong>${escapeHtml(msg.sender?.id || 'unknown')}</strong> 
+          ${msg.recipient?.id ? `→ <strong>${escapeHtml(msg.recipient.id)}</strong>` : '→ 📢 广播'}
           <br>
-          ${msg.payload?.subject ? `<em>${msg.payload.subject}</em><br>` : ''}
-          ${msg.payload?.content || msg.payload?.title || JSON.stringify(msg.payload)}
+          ${msg.payload?.subject ? `<em>${escapeHtml(msg.payload.subject)}</em><br>` : ''}
+          ${escapeHtml(content)}
         </div>
         <div class="message-sender">
-          ID: ${msg.id} | 优先级：${msg.metadata?.priority || 'normal'}
+          ID: ${escapeHtml(msg.id)} | 优先级：${escapeHtml(msg.metadata?.priority || 'normal')}
         </div>
       </div>
     `;
@@ -322,7 +329,6 @@ function createAgent() {
   const role = prompt('Agent Role (developer/reviewer/tester):');
   if (id && role) {
     alert(`[牢张] 正在创建 Agent: ${id} (${role})...`);
-    // 实际调用 API
   }
 }
 
@@ -332,7 +338,6 @@ function assignTask() {
   const desc = prompt('任务描述:');
   if (agentId && title) {
     alert(`[福瑞] 任务已分配给 ${agentId}，交给我吧！`);
-    // 实际调用 API
   }
 }
 
@@ -341,7 +346,6 @@ function broadcastMessage() {
   const content = prompt('广播内容:');
   if (subject && content) {
     alert(`[福瑞] 广播已发送！所有 Agent 都会收到。`);
-    // 实际调用 API
   }
 }
 
@@ -381,13 +385,25 @@ function formatUptime(seconds) {
   return `${h}h ${m}m ${s}s`;
 }
 
-function formatTime(isoString) {
+function formatLocalTime(isoString) {
   if (!isoString) return '-';
   const date = new Date(isoString);
-  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString('zh-CN', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit',
+    hour12: false
+  });
 }
 
 function updateLastUpdate() {
   const now = new Date();
   document.getElementById('last-update').textContent = `最后更新：${now.toLocaleTimeString('zh-CN')}`;
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
