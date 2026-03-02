@@ -1,6 +1,6 @@
 /**
- * Pheromone Dashboard v3.7
- * Minimalist Breathing Dot Style (like "在线" indicator)
+ * Pheromone Dashboard v3.8
+ * Green Dashed Lines + Message Transmission Animation
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -14,13 +14,14 @@ let hoveredNode = null;
 let nodePositions = {};
 let mousePos = { x: 0, y: 0 };
 let animationFrameId = null;
+let messageAnimations = []; // Active message animations
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v3.7 initialized');
+  console.log('🐜 Pheromone Dashboard v3.8 initialized');
   
   // Initial data fetch
   updateDashboard();
@@ -33,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize canvas
   initCanvas();
+  
+  // Simulate message transmission for demo
+  setInterval(simulateMessageTransmission, 2000);
 });
 
 // ============================================================================
@@ -171,6 +175,31 @@ function addMessageToTop(msg) {
 }
 
 // ============================================================================
+// Message Transmission Animation
+// ============================================================================
+
+function simulateMessageTransmission() {
+  if (!swarmVisible || agents.length < 2) return;
+  
+  // Pick random sender and receiver
+  const senderId = agents[Math.floor(Math.random() * agents.length)].id;
+  let receiverId;
+  do {
+    receiverId = agents[Math.floor(Math.random() * agents.length)].id;
+  } while (receiverId === senderId);
+  
+  // Create message animation
+  if (nodePositions[senderId] && nodePositions[receiverId]) {
+    messageAnimations.push({
+      from: senderId,
+      to: receiverId,
+      progress: 0,
+      speed: 0.02 + Math.random() * 0.02
+    });
+  }
+}
+
+// ============================================================================
 // Rendering
 // ============================================================================
 
@@ -226,7 +255,7 @@ function renderMessage(msg) {
 }
 
 // ============================================================================
-// Interactive Swarm Visualization (Minimalist Breathing Dot Style)
+// Interactive Swarm Visualization (Green Dashed Lines + Message Animation)
 // ============================================================================
 
 function initCanvas() {
@@ -281,7 +310,7 @@ function initializeNodePositions() {
       y: canvas.height / 2 + Math.sin(angle) * radius,
       baseX: canvas.width / 2 + Math.cos(angle) * radius,
       baseY: canvas.height / 2 + Math.sin(angle) * radius,
-      vx: (Math.random() - 0.5) * 0.2, // Slower movement
+      vx: (Math.random() - 0.5) * 0.2,
       vy: (Math.random() - 0.5) * 0.2,
       breathing: Math.random() * Math.PI * 2,
       agent: agent
@@ -293,7 +322,6 @@ function updateNodePositions() {
   // Sync with latest agent data
   agents.forEach(agent => {
     if (!nodePositions[agent.id]) {
-      // New agent, add to positions
       const padding = 150;
       const angle = Math.random() * Math.PI * 2;
       const radius = Math.min(canvas.width, canvas.height) * 0.3;
@@ -309,7 +337,6 @@ function updateNodePositions() {
         agent: agent
       };
     } else {
-      // Update agent data
       nodePositions[agent.id].agent = agent;
     }
   });
@@ -324,8 +351,6 @@ function updateNodePositions() {
 
 function getMousePos(e) {
   const rect = canvas.getBoundingClientRect();
-  
-  // Calculate scale factor (in case canvas is scaled via CSS)
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   
@@ -340,7 +365,6 @@ function handleMouseMove(e) {
   mousePos.x = pos.x;
   mousePos.y = pos.y;
   
-  // Check if hovering over a node
   hoveredNode = null;
   canvas.style.cursor = 'default';
   
@@ -349,7 +373,6 @@ function handleMouseMove(e) {
     const dy = mousePos.y - nodePos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // Hit detection radius (larger than visual radius for easier interaction)
     if (dist < 30) {
       hoveredNode = id;
       canvas.style.cursor = 'pointer';
@@ -357,7 +380,6 @@ function handleMouseMove(e) {
     }
   }
   
-  // Dragging
   if (draggedNode && nodePositions[draggedNode]) {
     nodePositions[draggedNode].x = mousePos.x;
     nodePositions[draggedNode].y = mousePos.y;
@@ -432,47 +454,102 @@ function animateSwarm() {
 function drawSwarm() {
   // Update positions
   Object.entries(nodePositions).forEach(([id, pos]) => {
-    // Stop movement if hovered or dragged
     if (id !== hoveredNode && id !== draggedNode) {
       pos.x += pos.vx;
       pos.y += pos.vy;
-      
-      // Breathing animation (like "在线" indicator - slow pulse)
       pos.breathing += 0.02;
       
-      // Boundary check with bounce
       if (pos.x < 50 || pos.x > canvas.width - 50) pos.vx *= -1;
       if (pos.y < 50 || pos.y > canvas.height - 50) pos.vy *= -1;
     }
   });
   
-  // Draw connections (thin lines)
-  ctx.lineWidth = 1;
+  // Update message animations
+  for (let i = messageAnimations.length - 1; i >= 0; i--) {
+    const anim = messageAnimations[i];
+    anim.progress += anim.speed;
+    
+    if (anim.progress >= 1) {
+      messageAnimations.splice(i, 1);
+    }
+  }
+  
+  // Draw connections (Green Dashed Lines)
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#00ffa340'; // Green with opacity
+  ctx.setLineDash([5, 5]); // Dashed line
+  
   const positions = Object.entries(nodePositions);
   for (let i = 0; i < positions.length; i++) {
     for (let j = i + 1; j < positions.length; j++) {
       const [id1, pos1] = positions[i];
       const [id2, pos2] = positions[j];
       
+      // Check if there's an active message on this connection
+      const hasMessage = messageAnimations.find(
+        anim => (anim.from === id1 && anim.to === id2) || (anim.from === id2 && anim.to === id1)
+      );
+      
+      if (hasMessage) {
+        // Highlighted line for active message
+        ctx.strokeStyle = '#00ffa380'; // Brighter green
+        ctx.setLineDash([10, 5]); // Different dash pattern
+      } else {
+        ctx.strokeStyle = '#00ffa340'; // Normal green
+        ctx.setLineDash([5, 5]);
+      }
+      
       ctx.beginPath();
       ctx.moveTo(pos1.x, pos1.y);
       ctx.lineTo(pos2.x, pos2.y);
-      ctx.strokeStyle = getRoleColor(pos1.agent?.role) + '30';
       ctx.stroke();
     }
   }
+  
+  // Reset line dash
+  ctx.setLineDash([]);
+  
+  // Draw message transmission animations
+  messageAnimations.forEach(anim => {
+    const fromPos = nodePositions[anim.from];
+    const toPos = nodePositions[anim.to];
+    
+    if (!fromPos || !toPos) return;
+    
+    // Calculate current position
+    const x = fromPos.x + (toPos.x - fromPos.x) * anim.progress;
+    const y = fromPos.y + (toPos.y - fromPos.y) * anim.progress;
+    
+    // Draw message packet (glowing dot)
+    const packetRadius = 4 + Math.sin(anim.progress * Math.PI) * 2;
+    
+    // Outer glow
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, packetRadius * 3);
+    gradient.addColorStop(0, '#00ffa380');
+    gradient.addColorStop(1, '#00ffa300');
+    
+    ctx.beginPath();
+    ctx.arc(x, y, packetRadius * 3, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Inner dot
+    ctx.beginPath();
+    ctx.arc(x, y, packetRadius, 0, Math.PI * 2);
+    ctx.fillStyle = '#00ffa3';
+    ctx.fill();
+  });
   
   // Draw nodes (Minimalist Breathing Dot Style)
   positions.forEach(([id, pos]) => {
     const isHovered = id === hoveredNode;
     const isDragged = id === draggedNode;
     
-    // Breathing effect (opacity pulse like "在线" indicator)
     const breath = Math.sin(pos.breathing);
     const baseOpacity = 0.6;
-    const opacity = baseOpacity + breath * 0.4; // 0.2 - 1.0
+    const opacity = baseOpacity + breath * 0.4;
     
-    // Draw ripple (concentric circles expanding)
+    // Draw ripple
     const rippleRadius = 15 + breath * 10;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
@@ -480,7 +557,7 @@ function drawSwarm() {
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Draw outer glow (soft glow)
+    // Draw outer glow
     const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 20);
     gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '40');
     gradient.addColorStop(1, getRoleColor(pos.agent?.role) + '00');
@@ -490,7 +567,7 @@ function drawSwarm() {
     ctx.fillStyle = gradient;
     ctx.fill();
     
-    // Draw dot (like "在线" indicator - simple circle)
+    // Draw dot
     const dotRadius = isHovered || isDragged ? 6 : 5;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, dotRadius, 0, Math.PI * 2);
@@ -499,7 +576,7 @@ function drawSwarm() {
     ctx.fill();
     ctx.globalAlpha = 1.0;
     
-    // Draw hover effect (white ring)
+    // Draw hover effect
     if (isHovered) {
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, dotRadius + 6, 0, Math.PI * 2);
@@ -507,7 +584,6 @@ function drawSwarm() {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       
-      // Draw tooltip
       drawTooltip(pos, pos.agent);
     }
   });
@@ -521,7 +597,6 @@ function drawTooltip(pos, agent) {
   let tooltipX = pos.x + 20;
   let tooltipY = pos.y - tooltipHeight / 2;
   
-  // Keep tooltip within canvas
   if (tooltipX + tooltipWidth > canvas.width) {
     tooltipX = pos.x - tooltipWidth - 20;
   }
@@ -532,12 +607,10 @@ function drawTooltip(pos, agent) {
     tooltipY = canvas.height - tooltipHeight - 10;
   }
   
-  // Background
   ctx.fillStyle = 'rgba(10, 10, 10, 0.95)';
   ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
   ctx.lineWidth = 1;
   
-  // Use roundRect if available, otherwise use rect
   if (ctx.roundRect) {
     ctx.beginPath();
     ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
@@ -548,7 +621,6 @@ function drawTooltip(pos, agent) {
     ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
   }
   
-  // Content
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 13px sans-serif';
   ctx.fillText(agent.id, tooltipX + 15, tooltipY + 25);
@@ -698,7 +770,6 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Add roundRect polyfill for Canvas
 if (!CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
     if (w < 2 * r) r = w / 2;
