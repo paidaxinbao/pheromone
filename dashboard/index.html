@@ -3,89 +3,116 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pheromone Dashboard - Agent Swarm Monitor</title>
+  <title>Pheromone Dashboard - 蜂群监控板</title>
   <link rel="stylesheet" href="style.css">
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <header>
-    <h1>🐜 Pheromone Dashboard</h1>
-    <p>Agent Swarm Monitoring & Communication</p>
+    <h1>🐜 Pheromone Dashboard <span class="subtitle">蜂群监控板</span></h1>
     <div id="status-bar">
-      <span id="connection-status">●</span>
-      <span id="last-update">Updating...</span>
+      <span id="connection-status" class="status-indicator">●</span>
+      <span id="last-update">连接中...</span>
+      <button id="refresh-btn" onclick="updateDashboard()">🔄 刷新</button>
     </div>
   </header>
 
   <main>
-    <!-- Hub Status -->
+    <!-- Hub 状态 -->
     <section class="card hub-status">
-      <h2>📡 Mailbox Hub Status</h2>
-      <div id="hub-health" class="health-indicator">
-        <div class="metric">
-          <span class="label">Status</span>
-          <span id="hub-status" class="value">Loading...</span>
+      <h2>📡 Hub 状态</h2>
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="label">状态</span>
+          <span id="hub-status" class="value status-online">在线</span>
         </div>
-        <div class="metric">
-          <span class="label">Uptime</span>
+        <div class="status-item">
+          <span class="label">运行时间</span>
           <span id="hub-uptime" class="value">-</span>
         </div>
-        <div class="metric">
-          <span class="label">Agents</span>
-          <span id="hub-agents" class="value">-</span>
+        <div class="status-item">
+          <span class="label">Agent 数量</span>
+          <span id="hub-agents" class="value">0</span>
         </div>
-        <div class="metric">
-          <span class="label">Messages</span>
-          <span id="hub-messages" class="value">-</span>
+        <div class="status-item">
+          <span class="label">消息数量</span>
+          <span id="hub-messages" class="value">0</span>
         </div>
       </div>
     </section>
 
-    <!-- Agent Status -->
-    <section class="card agent-status">
-      <h2>🤖 Agent Status</h2>
-      <div id="agent-grid" class="agent-grid">
-        <!-- Agents will be rendered here -->
-      </div>
-    </section>
-
-    <!-- Statistics -->
+    <!-- 统计图表 -->
     <section class="card statistics">
-      <h2>📊 Statistics</h2>
-      <div id="stats-grid" class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-value" id="stat-total-agents">0</div>
-          <div class="stat-label">Total Agents</div>
+      <h2>📊 数据统计</h2>
+      <div class="charts-grid">
+        <div class="chart-container">
+          <h3>Agent 角色分布</h3>
+          <canvas id="agent-role-chart"></canvas>
         </div>
-        <div class="stat-box">
-          <div class="stat-value" id="stat-online">0</div>
-          <div class="stat-label">Online</div>
+        <div class="chart-container">
+          <h3>消息类型分布</h3>
+          <canvas id="message-type-chart"></canvas>
         </div>
-        <div class="stat-box">
-          <div class="stat-value" id="stat-total-messages">0</div>
-          <div class="stat-label">Total Messages</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-value" id="stat-messages-by-role">-</div>
-          <div class="stat-label">By Role</div>
+        <div class="chart-container">
+          <h3>活动趋势</h3>
+          <canvas id="activity-trend-chart"></canvas>
         </div>
       </div>
     </section>
 
-    <!-- Recent Messages -->
+    <!-- Agent 状态 -->
+    <section class="card agent-status">
+      <div class="card-header">
+        <h2>🤖 Agent 状态</h2>
+        <div class="card-actions">
+          <button onclick="filterAgents('all')">全部</button>
+          <button onclick="filterAgents('online')">在线</button>
+          <button onclick="filterAgents('offline')">离线</button>
+        </div>
+      </div>
+      <div id="agent-grid" class="agent-grid">
+        <!-- Agents 动态加载 -->
+      </div>
+    </section>
+
+    <!-- 实时消息流 -->
     <section class="card messages">
-      <h2>💬 Recent Messages</h2>
+      <div class="card-header">
+        <h2>💬 实时消息流</h2>
+        <div class="card-actions">
+          <input type="text" id="search-box" placeholder="搜索消息..." onkeyup="searchMessages()">
+          <select id="filter-type" onchange="filterMessages()">
+            <option value="all">全部类型</option>
+            <option value="message.direct">直接消息</option>
+            <option value="message.broadcast">广播</option>
+            <option value="task.assign">任务分配</option>
+            <option value="task.update">进度更新</option>
+          </select>
+        </div>
+      </div>
       <div id="message-log" class="message-log">
-        <p class="empty">No messages yet</p>
+        <p class="empty">正在加载消息...</p>
+      </div>
+    </section>
+
+    <!-- 快速操作 -->
+    <section class="card quick-actions">
+      <h2>⚡ 快速操作</h2>
+      <div class="action-grid">
+        <button onclick="createAgent()" class="action-btn">➕ 创建 Agent</button>
+        <button onclick="assignTask()" class="action-btn">📋 分配任务</button>
+        <button onclick="broadcastMessage()" class="action-btn">📢 广播消息</button>
+        <button onclick="exportData()" class="action-btn">💾 导出数据</button>
       </div>
     </section>
   </main>
 
   <footer>
     <p>
-      Pheromone Dashboard v1.0 | 
-      <a href="http://localhost:18888/health" target="_blank">Mailbox Hub</a> |
-      Auto-refresh: 10s
+      Pheromone Dashboard v2.0 | 
+      自动刷新：10 秒 | 
+      <a href="http://localhost:18888/health" target="_blank">Hub API</a> |
+      <a href="https://github.com/paidaxinbao/pheromone" target="_blank">GitHub</a>
     </p>
   </footer>
 
