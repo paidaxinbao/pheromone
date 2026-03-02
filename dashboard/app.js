@@ -1,6 +1,6 @@
 /**
- * Pheromone Dashboard v3.5
- * Fixed Swarm Visualization - Breathing, Hover, Drag, Click
+ * Pheromone Dashboard v3.6
+ * Fixed Swarm Visualization - Accurate Hit Detection + Landing Page Breathing Effect
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -13,13 +13,14 @@ let draggedNode = null;
 let hoveredNode = null;
 let nodePositions = {};
 let mousePos = { x: 0, y: 0 };
+let animationFrameId = null;
 
 // ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🐜 Pheromone Dashboard v3.5 initialized');
+  console.log('🐜 Pheromone Dashboard v3.6 initialized');
   
   // Initial data fetch
   updateDashboard();
@@ -225,7 +226,7 @@ function renderMessage(msg) {
 }
 
 // ============================================================================
-// Interactive Swarm Visualization (FIXED)
+// Interactive Swarm Visualization (FIXED - Accurate Hit Detection)
 // ============================================================================
 
 function initCanvas() {
@@ -249,12 +250,14 @@ function initCanvas() {
   window.addEventListener('resize', resizeCanvas);
   
   // Start animation loop
-  requestAnimationFrame(animateSwarm);
+  animateSwarm();
 }
 
 function resizeCanvas() {
   if (!canvas) return;
   const container = canvas.parentElement;
+  
+  // Set canvas size to match container
   canvas.width = container.offsetWidth;
   canvas.height = 600;
   
@@ -278,8 +281,8 @@ function initializeNodePositions() {
       y: canvas.height / 2 + Math.sin(angle) * radius,
       baseX: canvas.width / 2 + Math.cos(angle) * radius,
       baseY: canvas.height / 2 + Math.sin(angle) * radius,
-      vx: (Math.random() - 0.5) * 0.3, // Slower movement
-      vy: (Math.random() - 0.5) * 0.3,
+      vx: (Math.random() - 0.5) * 0.2, // Slower movement
+      vy: (Math.random() - 0.5) * 0.2,
       breathing: Math.random() * Math.PI * 2,
       agent: agent
     };
@@ -300,8 +303,8 @@ function updateNodePositions() {
         y: canvas.height / 2 + Math.sin(angle) * radius,
         baseX: canvas.width / 2 + Math.cos(angle) * radius,
         baseY: canvas.height / 2 + Math.sin(angle) * radius,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
         breathing: Math.random() * Math.PI * 2,
         agent: agent
       };
@@ -319,21 +322,35 @@ function updateNodePositions() {
   });
 }
 
-function handleMouseMove(e) {
+function getMousePos(e) {
   const rect = canvas.getBoundingClientRect();
-  mousePos.x = e.clientX - rect.left;
-  mousePos.y = e.clientY - rect.top;
+  
+  // Calculate scale factor (in case canvas is scaled via CSS)
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+function handleMouseMove(e) {
+  const pos = getMousePos(e);
+  mousePos.x = pos.x;
+  mousePos.y = pos.y;
   
   // Check if hovering over a node
   hoveredNode = null;
   canvas.style.cursor = 'default';
   
-  for (const [id, pos] of Object.entries(nodePositions)) {
-    const dx = mousePos.x - pos.x;
-    const dy = mousePos.y - pos.y;
+  for (const [id, nodePos] of Object.entries(nodePositions)) {
+    const dx = mousePos.x - nodePos.x;
+    const dy = mousePos.y - nodePos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    if (dist < 25) { // Hit detection radius
+    // Hit detection radius (larger than visual radius for easier interaction)
+    if (dist < 30) {
       hoveredNode = id;
       canvas.style.cursor = 'pointer';
       break;
@@ -391,7 +408,12 @@ function handleTouchMove(e) {
 }
 
 function animateSwarm() {
-  if (!ctx || !canvas) return;
+  if (!ctx || !canvas) {
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+    }
+    return;
+  }
   
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
@@ -404,7 +426,7 @@ function animateSwarm() {
     drawSwarm();
   }
   
-  requestAnimationFrame(animateSwarm);
+  animationFrameId = requestAnimationFrame(animateSwarm);
 }
 
 function drawSwarm() {
@@ -415,11 +437,8 @@ function drawSwarm() {
       pos.x += pos.vx;
       pos.y += pos.vy;
       
-      // Slow breathing (only when working)
-      const isWorking = pos.agent?.status === 'working' || pos.agent?.status === 'busy';
-      if (isWorking) {
-        pos.breathing += 0.02; // Slower breathing frequency
-      }
+      // Breathing animation (like landing page - slow and smooth)
+      pos.breathing += 0.015;
       
       // Boundary check with bounce
       if (pos.x < 50 || pos.x > canvas.width - 50) pos.vx *= -1;
@@ -452,29 +471,26 @@ function drawSwarm() {
     const isHovered = id === hoveredNode;
     const isDragged = id === draggedNode;
     
-    // Breathing effect (only when working)
-    const isWorking = pos.agent?.status === 'working' || pos.agent?.status === 'busy';
-    const breath = isWorking ? Math.sin(pos.breathing) * 3 : 0;
-    const baseRadius = isHovered || isDragged ? 20 : 15;
+    // Breathing effect (like landing page - always breathing, slower)
+    const breath = Math.sin(pos.breathing) * 4;
+    const baseRadius = isHovered || isDragged ? 22 : 18;
     const radius = baseRadius + breath;
     
-    // Draw ripple if working
-    if (isWorking) {
-      const rippleRadius = radius + 15 + Math.sin(pos.breathing * 2) * 5;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = getRoleColor(pos.agent?.role) + '30';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    // Draw ripple (like landing page)
+    const rippleRadius = radius + 20 + Math.sin(pos.breathing * 2) * 8;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = getRoleColor(pos.agent?.role) + '20';
+    ctx.lineWidth = 2;
+    ctx.stroke();
     
-    // Draw outer glow
-    const gradient = ctx.createRadialGradient(pos.x, pos.y, radius * 0.5, pos.x, pos.y, radius * 2.5);
-    gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '80');
+    // Draw outer glow (like landing page)
+    const gradient = ctx.createRadialGradient(pos.x, pos.y, radius * 0.5, pos.x, pos.y, radius * 3);
+    gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '60');
     gradient.addColorStop(1, getRoleColor(pos.agent?.role) + '00');
     
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, radius * 2.5, 0, Math.PI * 2);
+    ctx.arc(pos.x, pos.y, radius * 3, 0, Math.PI * 2);
     ctx.fillStyle = gradient;
     ctx.fill();
     
@@ -484,16 +500,16 @@ function drawSwarm() {
     ctx.fillStyle = getRoleColor(pos.agent?.role);
     ctx.fill();
     
-    // Draw highlight
+    // Draw highlight (like landing page)
     ctx.beginPath();
-    ctx.arc(pos.x - radius * 0.3, pos.y - radius * 0.3, radius * 0.3, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.arc(pos.x - radius * 0.3, pos.y - radius * 0.3, radius * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.fill();
     
     // Draw hover effect
     if (isHovered) {
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius + 5, 0, Math.PI * 2);
+      ctx.arc(pos.x, pos.y, radius + 8, 0, Math.PI * 2);
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.stroke();
@@ -509,12 +525,12 @@ function drawTooltip(pos, agent) {
   
   const tooltipWidth = 200;
   const tooltipHeight = 120;
-  let tooltipX = pos.x + 30;
+  let tooltipX = pos.x + 35;
   let tooltipY = pos.y - tooltipHeight / 2;
   
   // Keep tooltip within canvas
   if (tooltipX + tooltipWidth > canvas.width) {
-    tooltipX = pos.x - tooltipWidth - 30;
+    tooltipX = pos.x - tooltipWidth - 35;
   }
   if (tooltipY < 10) {
     tooltipY = 10;
@@ -528,10 +544,16 @@ function drawTooltip(pos, agent) {
   ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
   ctx.lineWidth = 1;
   
-  ctx.beginPath();
-  ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
-  ctx.fill();
-  ctx.stroke();
+  // Use roundRect if available, otherwise use rect
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+    ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+  }
   
   // Content
   ctx.fillStyle = '#ffffff';
