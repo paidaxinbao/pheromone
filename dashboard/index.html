@@ -3,208 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pheromone Dashboard v3.0 - 蜂群可视化</title>
+  <title>Pheromone Dashboard</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <header>
-    <div class="header-content">
-      <h1>🐜 Pheromone Dashboard <span class="subtitle">蜂群监控板</span></h1>
-      <div class="header-actions">
-        <button id="mode-toggle" onclick="toggleMode()" class="mode-btn">
-          <span class="mode-icon">🔍</span>
-          <span class="mode-text">简约模式</span>
+  <!-- 着陆页 -->
+  <main class="landing-page" id="landing-page">
+    <div class="hero">
+      <h1 class="hero-title">
+        <span class="gradient-text">Pheromone</span>
+        <span class="subtitle">Agent Swarm Dashboard</span>
+      </h1>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="landing-hub-status">●</div>
+          <div class="stat-label">Hub 状态</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="landing-agents">0</div>
+          <div class="stat-label">Agent</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="landing-messages">0</div>
+          <div class="stat-label">消息</div>
+        </div>
+      </div>
+      
+      <div class="cta-buttons">
+        <button class="btn btn-primary" onclick="enterDashboard()">
+          进入仪表盘
         </button>
-        <button id="visual-toggle" onclick="toggleVisualization()" class="visual-btn">
-          <span class="visual-icon">🕸️</span>
-          <span class="visual-text">显示蜂群</span>
+        <button class="btn btn-secondary" onclick="toggleSwarm()">
+          显示蜂群
         </button>
       </div>
     </div>
-    <div id="status-bar">
-      <span id="connection-status" class="status-indicator">●</span>
-      <span id="last-update">连接中...</span>
-      <button id="refresh-btn" onclick="updateDashboard()">🔄 刷新</button>
-    </div>
-  </header>
-
-  <main id="dashboard-main">
-    <!-- 简约模式 -->
-    <section class="simple-mode" id="simple-mode">
-      <div class="simple-grid">
-        <div class="simple-card">
-          <h3>📡 Hub 状态</h3>
-          <div class="simple-stat">
-            <span class="stat-label">状态</span>
-            <span id="simple-hub-status" class="stat-value status-online">在线</span>
-          </div>
-          <div class="simple-stat">
-            <span class="stat-label">Agent</span>
-            <span id="simple-agents" class="stat-value">0</span>
-          </div>
-          <div class="simple-stat">
-            <span class="stat-label">消息</span>
-            <span id="simple-messages" class="stat-value">0</span>
-          </div>
-        </div>
-        
-        <div class="simple-card">
-          <h3>💬 最新消息</h3>
-          <div id="simple-messages-list" class="simple-messages">
-            <p class="empty">暂无消息</p>
-          </div>
-        </div>
-        
-        <div class="simple-card">
-          <h3>🤖 Agent 列表</h3>
-          <div id="simple-agents-list" class="simple-agents">
-            <p class="empty">暂无 Agent</p>
-          </div>
+    
+    <footer class="landing-footer">
+      <p>Pheromone Dashboard v3.2</p>
+    </footer>
+  </main>
+  
+  <!-- 仪表盘 -->
+  <main class="dashboard" id="dashboard" style="display: none;">
+    <header>
+      <div class="header-content">
+        <h1>
+          <span class="gradient-text">Pheromone</span>
+          <span class="subtitle">Dashboard</span>
+        </h1>
+        <div class="header-actions">
+          <button class="btn btn-sm" onclick="exitDashboard()">← 返回</button>
+          <button class="btn btn-sm" onclick="toggleSwarm()">🕸️ 蜂群</button>
         </div>
       </div>
-    </section>
-
-    <!-- 复杂模式 -->
-    <section class="complex-mode" id="complex-mode" style="display: none;">
-      <!-- Hub 状态 -->
-      <section class="card hub-status">
-        <h2>📡 Hub 状态</h2>
-        <div class="status-grid">
-          <div class="status-item">
-            <span class="label">状态</span>
-            <span id="hub-status" class="value status-online">在线</span>
+    </header>
+    
+    <div class="dashboard-content">
+      <!-- 状态卡片 -->
+      <section class="cards-grid">
+        <div class="card">
+          <h3>Hub 状态</h3>
+          <div class="status-indicator" id="hub-status">
+            <span class="dot online"></span>
+            <span>在线</span>
           </div>
-          <div class="status-item">
-            <span class="label">运行时间</span>
-            <span id="hub-uptime" class="value">-</span>
+          <div class="metric">
+            <span class="metric-label">运行时间</span>
+            <span class="metric-value" id="hub-uptime">-</span>
           </div>
-          <div class="status-item">
-            <span class="label">Agent 数量</span>
-            <span id="hub-agents" class="value">0</span>
+        </div>
+        
+        <div class="card">
+          <h3>Agent</h3>
+          <div class="metric-large">
+            <span class="number" id="agent-count">0</span>
           </div>
-          <div class="status-item">
-            <span class="label">消息数量</span>
-            <span id="hub-messages" class="value">0</span>
+          <div class="agent-list" id="agent-list"></div>
+        </div>
+        
+        <div class="card">
+          <h3>消息</h3>
+          <div class="metric-large">
+            <span class="number" id="message-count">0</span>
           </div>
+          <div class="message-preview" id="message-preview"></div>
         </div>
       </section>
-
-      <!-- 蜂群可视化窗口 -->
-      <section class="card visualization-card">
-        <div class="card-header">
-          <h2>🕸️ 蜂群可视化</h2>
-          <div class="card-actions">
-            <button onclick="resetView()">重置视图</button>
-            <button onclick="toggleConnections()">切换连线</button>
-          </div>
+      
+      <!-- 蜂群可视化 -->
+      <section class="swarm-section" id="swarm-section" style="display: none;">
+        <div class="section-header">
+          <h2>蜂群可视化</h2>
+          <button class="btn btn-sm" onclick="toggleSwarm()">关闭</button>
         </div>
-        <div class="visualization-container">
+        <div class="swarm-container">
           <canvas id="swarm-canvas"></canvas>
-          <div id="visualization-overlay" class="viz-overlay">
-            <div class="viz-legend">
-              <div class="legend-item"><span class="legend-color manager"></span> Manager</div>
-              <div class="legend-item"><span class="legend-color developer"></span> Developer</div>
-              <div class="legend-item"><span class="legend-color reviewer"></span> Reviewer</div>
-              <div class="legend-item"><span class="legend-color tester"></span> Tester</div>
+          <div class="swarm-legend">
+            <div class="legend-item">
+              <span class="legend-dot manager"></span>
+              <span>Manager</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot developer"></span>
+              <span>Developer</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot reviewer"></span>
+              <span>Reviewer</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot tester"></span>
+              <span>Tester</span>
             </div>
           </div>
         </div>
       </section>
-
-      <!-- 统计图表 -->
-      <section class="card statistics">
-        <h2>📊 数据统计</h2>
-        <div class="charts-grid">
-          <div class="chart-container">
-            <h3>Agent 角色分布</h3>
-            <canvas id="agent-role-chart"></canvas>
-          </div>
-          <div class="chart-container">
-            <h3>消息类型分布</h3>
-            <canvas id="message-type-chart"></canvas>
-          </div>
-          <div class="chart-container">
-            <h3>活动趋势</h3>
-            <canvas id="activity-trend-chart"></canvas>
-          </div>
+      
+      <!-- 消息流 -->
+      <section class="messages-section">
+        <div class="section-header">
+          <h2>消息流</h2>
+          <span class="last-update" id="last-update">更新中...</span>
+        </div>
+        <div class="message-list" id="message-list">
+          <div class="empty">暂无消息</div>
         </div>
       </section>
-
-      <!-- Agent 状态 -->
-      <section class="card agent-status">
-        <div class="card-header">
-          <h2>🤖 Agent 状态</h2>
-          <div class="card-actions">
-            <button onclick="filterAgents('all')">全部</button>
-            <button onclick="filterAgents('online')">在线</button>
-            <button onclick="filterAgents('offline')">离线</button>
-          </div>
-        </div>
-        <div id="agent-grid" class="agent-grid">
-          <!-- Agents 动态加载 -->
-        </div>
-      </section>
-
-      <!-- 实时消息流 -->
-      <section class="card messages">
-        <div class="card-header">
-          <h2>💬 实时消息流</h2>
-          <div class="card-actions">
-            <input type="text" id="search-box" placeholder="搜索消息..." onkeyup="searchMessages()">
-            <select id="filter-type" onchange="filterMessages()">
-              <option value="all">全部类型</option>
-              <option value="message.direct">直接消息</option>
-              <option value="message.broadcast">广播</option>
-              <option value="task.assign">任务分配</option>
-              <option value="task.update">进度更新</option>
-            </select>
-          </div>
-        </div>
-        <div id="message-log" class="message-log">
-          <p class="empty">正在加载消息...</p>
-        </div>
-      </section>
-
-      <!-- 快速操作 -->
-      <section class="card quick-actions">
-        <h2>⚡ 快速操作</h2>
-        <div class="action-grid">
-          <button onclick="createAgent()" class="action-btn">➕ 创建 Agent</button>
-          <button onclick="assignTask()" class="action-btn">📋 分配任务</button>
-          <button onclick="broadcastMessage()" class="action-btn">📢 广播消息</button>
-          <button onclick="exportData()" class="action-btn">💾 导出数据</button>
-        </div>
-      </section>
-    </section>
-  </main>
-
-  <footer>
-    <p>
-      Pheromone Dashboard v3.0 | 
-      自动刷新：10 秒 | 
-      <a href="http://localhost:18888/health" target="_blank">Hub API</a> |
-      <a href="https://github.com/paidaxinbao/pheromone" target="_blank">GitHub</a>
-    </p>
-  </footer>
-
-  <!-- HeroUI Modal -->
-  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="modal-title">标题</h3>
-        <button class="modal-close" onclick="closeModal()">&times;</button>
-      </div>
-      <div id="modal-body" class="modal-body">
-        <!-- 内容动态加载 -->
-      </div>
-      <div class="modal-footer">
-        <button class="modal-btn cancel" onclick="closeModal()">取消</button>
-        <button class="modal-btn confirm" onclick="confirmModal()">确认</button>
-      </div>
     </div>
-  </div>
-
+  </main>
+  
   <script src="app.js"></script>
 </body>
 </html>
