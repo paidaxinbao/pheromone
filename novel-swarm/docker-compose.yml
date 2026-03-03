@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # Dashboard
+  dashboard:
+    image: nginx:alpine
+    container_name: novel-dashboard
+    ports:
+      - "18890:80"
+    volumes:
+      - ../dashboard:/usr/share/nginx/html:ro
+    networks:
+      - novel-net
+    restart: unless-stopped
+
+  # Hub
+  hub:
+    image: node:20-alpine
+    container_name: novel-hub
+    ports:
+      - "18888:18888"
+    volumes:
+      - ../hub:/app:ro
+    working_dir: /app
+    command: ["node", "hub-server.js"]
+    networks:
+      - novel-net
+    restart: unless-stopped
+
+  # Agent 1: Writer (作家)
+  writer:
+    image: node:20-alpine
+    container_name: novel-writer
+    environment:
+      - AGENT_ID=writer
+      - AGENT_ROLE=writer
+      - HUB_URL=http://hub:18888
+      - TOPIC=科幻小说：星际迷航
+    volumes:
+      - ../agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "novel-agent.js"]
+    networks:
+      - novel-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 2: Editor (编辑)
+  editor:
+    image: node:20-alpine
+    container_name: novel-editor
+    environment:
+      - AGENT_ID=editor
+      - AGENT_ROLE=editor
+      - HUB_URL=http://hub:18888
+      - TOPIC=科幻小说：星际迷航
+    volumes:
+      - ../agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "novel-agent.js"]
+    networks:
+      - novel-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 3: Character Designer (角色设计师)
+  character:
+    image: node:20-alpine
+    container_name: novel-character
+    environment:
+      - AGENT_ID=character
+      - AGENT_ROLE=character
+      - HUB_URL=http://hub:18888
+      - TOPIC=科幻小说：星际迷航
+    volumes:
+      - ../agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "novel-agent.js"]
+    networks:
+      - novel-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 4: Plot Designer (情节设计师)
+  plot:
+    image: node:20-alpine
+    container_name: novel-plot
+    environment:
+      - AGENT_ID=plot
+      - AGENT_ROLE=plot
+      - HUB_URL=http://hub:18888
+      - TOPIC=科幻小说：星际迷航
+    volumes:
+      - ../agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "novel-agent.js"]
+    networks:
+      - novel-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 5: World Builder (世界观设计师)
+  world:
+    image: node:20-alpine
+    container_name: novel-world
+    environment:
+      - AGENT_ID=world
+      - AGENT_ROLE=world
+      - HUB_URL=http://hub:18888
+      - TOPIC=科幻小说：星际迷航
+    volumes:
+      - ../agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "novel-agent.js"]
+    networks:
+      - novel-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 6: Reviewer (审稿人)
+  reviewer:
+    image: node:20-alpine
+    container_name: novel-reviewer
+    environment:
+      - AGENT_ID=reviewer
+      - AGENT_ROLE=reviewer
+      - HUB_URL=http://hub:18888
+      - TOPIC=科幻小说：星际迷航
+    volumes:
+      - ../agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "novel-agent.js"]
+    networks:
+      - novel-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+networks:
+  novel-net:
+    driver: bridge

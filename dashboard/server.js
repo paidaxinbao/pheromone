@@ -75,7 +75,8 @@ function serveFile(res, filePath, contentType) {
       res.end('Not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': contentType });
+    const charset = contentType.startsWith('text/') || contentType === 'application/json' ? '; charset=utf-8' : '';
+    res.writeHead(200, { 'Content-Type': contentType + charset });
     res.end(data);
   });
 }
@@ -96,28 +97,28 @@ const server = http.createServer(async (req, res) => {
   // API endpoints
   if (url.pathname === '/api/agents') {
     await updateCache();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true, agents: cache.agents }));
     return;
   }
   
   if (url.pathname === '/api/stats') {
     await updateCache();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true, stats: cache.stats }));
     return;
   }
   
   if (url.pathname === '/api/health') {
     const health = await fetchFromMailbox('/health');
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(health || { success: false, error: 'Mailbox unreachable' }));
     return;
   }
   
   if (url.pathname === '/api/messages') {
     await updateCache();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ success: true, messages: cache.messages }));
     return;
   }

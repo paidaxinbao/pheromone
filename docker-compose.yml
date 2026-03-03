@@ -113,6 +113,42 @@ services:
       - swarm-net
     restart: unless-stopped
 
+  # ============================================================================
+  # Writer Agent (科幻编剧)
+  # ============================================================================
+  writer:
+    build:
+      context: ./agent-runtime
+    container_name: writer
+    environment:
+      AGENT_ID: writer
+      AGENT_ROLE: writer
+      HUB_URL: http://hub:18888
+      CALLBACK_PORT: "9000"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
+  # ============================================================================
+  # Editor Agent (剧本编辑)
+  # ============================================================================
+  editor:
+    build:
+      context: ./agent-runtime
+    container_name: editor
+    environment:
+      AGENT_ID: editor
+      AGENT_ROLE: editor
+      HUB_URL: http://hub:18888
+      CALLBACK_PORT: "9000"
+    depends_on:
+      - hub
+    networks:
+      - swarm-net
+    restart: unless-stopped
+
 # ==============================================================================
 # Volumes
 # ==============================================================================

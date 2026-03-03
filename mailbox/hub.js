@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mailbox Hub v2 - Webhook Callback Mode
  * 
  * Features:
@@ -16,7 +16,7 @@ const http = require('http');
 const url = require('url');
 const crypto = require('crypto');
 const { MessageStore } = require('./message-store');
-const { CallbackDispatcher } = require('./callback-dispatcher');
+const CallbackDispatcher = require('./callback-dispatcher');
 
 // ============================================================================
 // Configuration
@@ -232,9 +232,8 @@ class SchemaValidator {
       errors.push({ field: 'id', message: 'Agent id is required' });
     }
     
-    const validRoles = ['manager', 'coordinator', 'developer', 'reviewer', 'tester'];
-    if (!agent.role || !validRoles.includes(agent.role)) {
-      errors.push({ field: 'role', message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+    if (!agent.role || typeof agent.role !== 'string' || agent.role.trim() === '') {
+      errors.push({ field: 'role', message: 'Role must be a non-empty string' });
     }
     
     return {
@@ -614,7 +613,7 @@ class MailboxHub {
     
     // Check for message loop
     const turn = body.metadata?.turn || 0;
-    if (turn > 20) {
+    if (turn > 50) {
       logger.error(`Message loop detected: ${body.id} (turn ${turn})`);
       return {
         status: 429,
@@ -706,6 +705,7 @@ class MailboxHub {
   parseBody(req) {
     return new Promise((resolve, reject) => {
       let body = '';
+      req.setEncoding('utf-8');
       req.on('data', chunk => body += chunk);
       req.on('end', () => {
         try {
@@ -719,7 +719,7 @@ class MailboxHub {
   }
 
   sendJson(res, status, body) {
-    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(body));
   }
 }
@@ -752,3 +752,4 @@ module.exports = {
   MessageRouter,
   CONFIG
 };
+

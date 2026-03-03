@@ -843,9 +843,11 @@ header {
 }
 
 #swarm-canvas {
+  display: block;
   width: 100%;
   height: 600px;
   cursor: grab;
+  background: transparent;
 }
 
 #swarm-canvas:active {
@@ -860,34 +862,6 @@ header {
   font-size: 0.85em;
   pointer-events: none;
 }
-
-.swarm-legend {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85em;
-  color: var(--text-muted);
-}
-
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.legend-dot.manager { background: #ff6b6b; }
-.legend-dot.developer { background: var(--primary); }
-.legend-dot.reviewer { background: var(--success); }
-.legend-dot.tester { background: var(--warning); }
 
 /* Messages Section */
 .messages-section {

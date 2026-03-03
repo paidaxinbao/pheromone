@@ -1,6 +1,9 @@
 /**
- * Pheromone Dashboard v3.8
- * Green Dashed Lines + Message Transmission Animation
+ * Pheromone Dashboard v3.11
+ * Performance Optimized: No gradient creation in render loop
+ * Fixed: Duplicate positions variable declaration
+ * Fixed: Animation loop initialization with proper timestamp handling
+ * Added: Frame rate control for consistent 60fps
  */
 
 const API_BASE = 'http://localhost:18888';
@@ -15,6 +18,9 @@ let nodePositions = {};
 let mousePos = { x: 0, y: 0 };
 let animationFrameId = null;
 let messageAnimations = []; // Active message animations
+let lastFrameTime = 0;
+const TARGET_FPS = 60;
+const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
 // ============================================================================
 // Initialization
@@ -22,6 +28,9 @@ let messageAnimations = []; // Active message animations
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🐜 Pheromone Dashboard v3.8 initialized');
+  
+  // Initialize canvas first
+  initCanvas();
   
   // Initial data fetch
   updateDashboard();
@@ -32,11 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Real-time messages (queue-style, no refresh)
   setInterval(fetchNewMessages, 3000);
   
-  // Initialize canvas
-  initCanvas();
-  
   // Simulate message transmission for demo
-  setInterval(simulateMessageTransmission, 2000);
+  setInterval(simulateMessageTransmission, 3000);
+  
+  console.log('[DOMContentLoaded] Dashboard ready, canvas initialized:', !!canvas, 'ctx:', !!ctx);
 });
 
 // ============================================================================
@@ -55,12 +63,24 @@ function exitDashboard() {
 }
 
 function showSwarmFromLanding() {
+  console.log('[showSwarmFromLanding] Entering dashboard...');
   swarmVisible = true;
   enterDashboard();
   setTimeout(() => {
+    console.log('[showSwarmFromLanding] Setting swarm section visible');
     document.getElementById('swarm-section').style.display = 'block';
-    resizeCanvas();
-    drawSwarm();
+    
+    // Wait for CSS to apply, then resize and initialize
+    setTimeout(() => {
+      console.log('[showSwarmFromLanding] Resizing canvas...');
+      resizeCanvas();
+      console.log('[showSwarmFromLanding] Agents count:', agents.length);
+      if (agents.length > 0) {
+        console.log('[showSwarmFromLanding] Initializing node positions...');
+        initializeNodePositions();
+      }
+      drawSwarm();
+    }, 100);
   }, 300);
 }
 
@@ -69,18 +89,31 @@ function toggleSwarm() {
   const section = document.getElementById('swarm-section');
   section.style.display = swarmVisible ? 'block' : 'none';
   
+  console.log('[toggleSwarm] Setting visible:', swarmVisible);
+  
   if (swarmVisible) {
     setTimeout(() => {
+      console.log('[toggleSwarm] Resizing canvas after display...');
       resizeCanvas();
+      if (agents.length > 0 && Object.keys(nodePositions).length === 0) {
+        console.log('[toggleSwarm] Initializing positions for', agents.length, 'agents');
+        initializeNodePositions();
+      }
       drawSwarm();
     }, 100);
   }
 }
 
 function resetSwarmView() {
+  console.log('Resetting swarm view, agents:', agents.length);
   nodePositions = {};
-  initializeNodePositions();
-  drawSwarm();
+  if (agents.length > 0) {
+    initializeNodePositions();
+    console.log('Initialized positions for', Object.keys(nodePositions).length, 'agents');
+  } else {
+    console.log('No agents to initialize');
+  }
+  // Note: drawSwarm() is called automatically by animateSwarm loop
 }
 
 // ============================================================================
@@ -93,6 +126,7 @@ async function updateDashboard() {
     const agentsData = await fetch(`${API_BASE}/agents`).then(r => r.json());
     
     agents = agentsData.agents || [];
+    console.log('Agents updated:', agents.length, agents.map(a => a.id));
     
     // Update landing page
     document.getElementById('landing-agents').textContent = health.agents;
@@ -121,7 +155,9 @@ async function updateDashboard() {
     
     // Update swarm if visible
     if (swarmVisible) {
+      console.log('Updating swarm positions, agents:', agents.length);
       updateNodePositions();
+      console.log('Node positions:', Object.keys(nodePositions).length);
     }
   } catch (error) {
     console.error('Update failed:', error);
@@ -259,11 +295,23 @@ function renderMessage(msg) {
 // ============================================================================
 
 function initCanvas() {
+  console.log('[initCanvas] Starting canvas initialization...');
   canvas = document.getElementById('swarm-canvas');
-  if (!canvas) return;
+  if (!canvas) {
+    console.error('[initCanvas] ERROR: Canvas element not found!');
+    return;
+  }
+  console.log('[initCanvas] Canvas element found:', canvas);
   
   ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.error('[initCanvas] ERROR: Failed to get 2D context!');
+    return;
+  }
+  console.log('[initCanvas] 2D context acquired:', ctx);
+  
   resizeCanvas();
+  console.log('[initCanvas] Canvas size:', canvas.width, 'x', canvas.height);
   
   // Mouse events
   canvas.addEventListener('mousemove', handleMouseMove);
@@ -279,19 +327,42 @@ function initCanvas() {
   window.addEventListener('resize', resizeCanvas);
   
   // Start animation loop
-  animateSwarm();
+  console.log('[initCanvas] Starting animation loop...');
+  lastFrameTime = 0; // Reset frame time on init
+  animationFrameId = requestAnimationFrame(animateSwarm);
+  console.log('[initCanvas] Animation loop initiated');
 }
 
 function resizeCanvas() {
-  if (!canvas) return;
+  if (!canvas) {
+    console.error('[resizeCanvas] Canvas is null');
+    return;
+  }
   const container = canvas.parentElement;
+  if (!container) {
+    console.error('[resizeCanvas] Canvas has no parent container');
+    return;
+  }
   
   // Set canvas size to match container
-  canvas.width = container.offsetWidth;
-  canvas.height = 600;
+  const containerWidth = container.offsetWidth;
+  const containerHeight = 600;
+  
+  console.log('[resizeCanvas] Container size:', containerWidth, 'x', containerHeight);
+  
+  if (containerWidth === 0) {
+    console.warn('[resizeCanvas] Container width is 0, canvas might be hidden. Using default 800px');
+    canvas.width = 800;
+  } else {
+    canvas.width = containerWidth;
+  }
+  canvas.height = containerHeight;
+  
+  console.log('[resizeCanvas] Canvas set to:', canvas.width, 'x', canvas.height);
   
   // Re-initialize positions on resize
   if (agents.length > 0 && Object.keys(nodePositions).length === 0) {
+    console.log('[resizeCanvas] Initializing positions for', agents.length, 'agents');
     initializeNodePositions();
   }
 }
@@ -299,17 +370,29 @@ function resizeCanvas() {
 function initializeNodePositions() {
   nodePositions = {};
   
+  if (!canvas) {
+    console.error('[initializeNodePositions] Canvas is null!');
+    return;
+  }
+  
+  if (canvas.width === 0 || canvas.height === 0) {
+    console.error('[initializeNodePositions] Canvas has zero dimensions!');
+    return;
+  }
+  
   // Random initial positions with padding
-  const padding = 150;
   agents.forEach((agent, index) => {
     const angle = (index / agents.length) * Math.PI * 2;
     const radius = Math.min(canvas.width, canvas.height) * 0.3;
     
+    const x = canvas.width / 2 + Math.cos(angle) * radius;
+    const y = canvas.height / 2 + Math.sin(angle) * radius;
+    
     nodePositions[agent.id] = {
-      x: canvas.width / 2 + Math.cos(angle) * radius,
-      y: canvas.height / 2 + Math.sin(angle) * radius,
-      baseX: canvas.width / 2 + Math.cos(angle) * radius,
-      baseY: canvas.height / 2 + Math.sin(angle) * radius,
+      x: x,
+      y: y,
+      baseX: x,
+      baseY: y,
       vx: (Math.random() - 0.5) * 0.2,
       vy: (Math.random() - 0.5) * 0.2,
       breathing: Math.random() * Math.PI * 2,
@@ -320,17 +403,18 @@ function initializeNodePositions() {
 
 function updateNodePositions() {
   // Sync with latest agent data
+  if (!canvas) return;
+  
   agents.forEach(agent => {
     if (!nodePositions[agent.id]) {
-      const padding = 150;
       const angle = Math.random() * Math.PI * 2;
-      const radius = Math.min(canvas.width, canvas.height) * 0.3;
+      const radius = Math.min(canvas.width || 800, canvas.height || 600) * 0.3;
       
       nodePositions[agent.id] = {
-        x: canvas.width / 2 + Math.cos(angle) * radius,
-        y: canvas.height / 2 + Math.sin(angle) * radius,
-        baseX: canvas.width / 2 + Math.cos(angle) * radius,
-        baseY: canvas.height / 2 + Math.sin(angle) * radius,
+        x: (canvas.width || 800) / 2 + Math.cos(angle) * radius,
+        y: (canvas.height || 600) / 2 + Math.sin(angle) * radius,
+        baseX: (canvas.width || 800) / 2 + Math.cos(angle) * radius,
+        baseY: (canvas.height || 600) / 2 + Math.sin(angle) * radius,
         vx: (Math.random() - 0.5) * 0.2,
         vy: (Math.random() - 0.5) * 0.2,
         breathing: Math.random() * Math.PI * 2,
@@ -429,13 +513,27 @@ function handleTouchMove(e) {
   handleMouseMove(mouseEvent);
 }
 
-function animateSwarm() {
+function animateSwarm(timestamp) {
   if (!ctx || !canvas) {
+    console.error('[animateSwarm] Missing ctx or canvas, stopping animation');
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
     }
     return;
   }
+  
+  // Initialize lastFrameTime on first call
+  if (!lastFrameTime) {
+    lastFrameTime = timestamp;
+  }
+  
+  // Frame rate control for consistent 60fps
+  const elapsed = timestamp - lastFrameTime;
+  if (elapsed < FRAME_INTERVAL) {
+    animationFrameId = requestAnimationFrame(animateSwarm);
+    return;
+  }
+  lastFrameTime = timestamp - (elapsed % FRAME_INTERVAL);
   
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
@@ -445,6 +543,9 @@ function animateSwarm() {
     ctx.textAlign = 'center';
     ctx.fillText('暂无 Agent', canvas.width / 2, canvas.height / 2);
   } else {
+    if (Object.keys(nodePositions).length === 0) {
+      initializeNodePositions();
+    }
     drawSwarm();
   }
   
@@ -452,8 +553,14 @@ function animateSwarm() {
 }
 
 function drawSwarm() {
+  const positions = Object.entries(nodePositions);
+  
+  if (positions.length === 0) {
+    return;
+  }
+  
   // Update positions
-  Object.entries(nodePositions).forEach(([id, pos]) => {
+  positions.forEach(([id, pos]) => {
     if (id !== hoveredNode && id !== draggedNode) {
       pos.x += pos.vx;
       pos.y += pos.vy;
@@ -476,10 +583,7 @@ function drawSwarm() {
   
   // Draw connections (Green Dashed Lines)
   ctx.lineWidth = 2;
-  ctx.strokeStyle = '#00ffa340'; // Green with opacity
-  ctx.setLineDash([5, 5]); // Dashed line
   
-  const positions = Object.entries(nodePositions);
   for (let i = 0; i < positions.length; i++) {
     for (let j = i + 1; j < positions.length; j++) {
       const [id1, pos1] = positions[i];
@@ -491,11 +595,10 @@ function drawSwarm() {
       );
       
       if (hasMessage) {
-        // Highlighted line for active message
-        ctx.strokeStyle = '#00ffa380'; // Brighter green
-        ctx.setLineDash([10, 5]); // Different dash pattern
+        ctx.strokeStyle = '#00ffa380';
+        ctx.setLineDash([10, 5]);
       } else {
-        ctx.strokeStyle = '#00ffa340'; // Normal green
+        ctx.strokeStyle = '#00ffa340';
         ctx.setLineDash([5, 5]);
       }
       
@@ -516,21 +619,15 @@ function drawSwarm() {
     
     if (!fromPos || !toPos) return;
     
-    // Calculate current position
     const x = fromPos.x + (toPos.x - fromPos.x) * anim.progress;
     const y = fromPos.y + (toPos.y - fromPos.y) * anim.progress;
     
-    // Draw message packet (glowing dot)
     const packetRadius = 4 + Math.sin(anim.progress * Math.PI) * 2;
     
-    // Outer glow
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, packetRadius * 3);
-    gradient.addColorStop(0, '#00ffa380');
-    gradient.addColorStop(1, '#00ffa300');
-    
+    // Outer glow - using solid color with alpha for performance
     ctx.beginPath();
     ctx.arc(x, y, packetRadius * 3, 0, Math.PI * 2);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = 'rgba(0, 255, 163, 0.2)';
     ctx.fill();
     
     // Inner dot
@@ -540,7 +637,7 @@ function drawSwarm() {
     ctx.fill();
   });
   
-  // Draw nodes (Minimalist Breathing Dot Style)
+  // Draw nodes (Optimized: no gradient creation in loop)
   positions.forEach(([id, pos]) => {
     const isHovered = id === hoveredNode;
     const isDragged = id === draggedNode;
@@ -548,30 +645,33 @@ function drawSwarm() {
     const breath = Math.sin(pos.breathing);
     const baseOpacity = 0.6;
     const opacity = baseOpacity + breath * 0.4;
+    const roleColor = getRoleColor(pos.agent?.role);
     
     // Draw ripple
     const rippleRadius = 15 + breath * 10;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, rippleRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = getRoleColor(pos.agent?.role) + '20';
+    ctx.strokeStyle = roleColor + '20';
     ctx.lineWidth = 1;
     ctx.stroke();
     
-    // Draw outer glow
-    const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 20);
-    gradient.addColorStop(0, getRoleColor(pos.agent?.role) + '40');
-    gradient.addColorStop(1, getRoleColor(pos.agent?.role) + '00');
-    
+    // Draw outer glow - optimized using rgba instead of gradient
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = roleColor + '15';
+    ctx.fill();
+    
+    // Inner glow
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = roleColor + '30';
     ctx.fill();
     
     // Draw dot
     const dotRadius = isHovered || isDragged ? 6 : 5;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, dotRadius, 0, Math.PI * 2);
-    ctx.fillStyle = getRoleColor(pos.agent?.role);
+    ctx.fillStyle = roleColor;
     ctx.globalAlpha = opacity;
     ctx.fill();
     ctx.globalAlpha = 1.0;
@@ -592,8 +692,21 @@ function drawSwarm() {
 function drawTooltip(pos, agent) {
   if (!agent) return;
   
-  const tooltipWidth = 200;
-  const tooltipHeight = 120;
+  // Calculate dynamic tooltip height based on content
+  const lineHeight = 22;
+  const padding = 16;
+  const headerHeight = 32;
+  let contentLines = 4; // ID, Role, Status, Last Active
+  
+  // Count additional lines
+  if (agent.callbackUrl) contentLines++;
+  if (agent.registeredAt) contentLines++;
+  if (agent.heartbeatInterval) contentLines++;
+  if (agent.messageStats || agent.messagesSent !== undefined || agent.messagesReceived !== undefined) contentLines++;
+  
+  const tooltipWidth = 260;
+  const tooltipHeight = headerHeight + (contentLines * lineHeight) + padding;
+  
   let tooltipX = pos.x + 20;
   let tooltipY = pos.y - tooltipHeight / 2;
   
@@ -607,37 +720,157 @@ function drawTooltip(pos, agent) {
     tooltipY = canvas.height - tooltipHeight - 10;
   }
   
-  ctx.fillStyle = 'rgba(10, 10, 10, 0.95)';
-  ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
-  ctx.lineWidth = 1;
+  // Draw tooltip background with enhanced shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 6;
+  
+  // Semi-transparent dark background for better readability
+  ctx.fillStyle = 'rgba(20, 20, 28, 0.95)';
+  ctx.strokeStyle = getRoleColor(agent.role) + 'cc';
+  ctx.lineWidth = 1.5;
   
   if (ctx.roundRect) {
     ctx.beginPath();
-    ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
+    ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 12);
     ctx.fill();
     ctx.stroke();
   } else {
     ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
     ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
   }
+  ctx.restore();
   
+  let currentY = tooltipY + padding + 8;
+  
+  // Agent ID (bold header with text shadow for clarity)
+  ctx.save();
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 13px sans-serif';
-  ctx.fillText(agent.id, tooltipX + 15, tooltipY + 25);
+  ctx.font = '600 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillText(agent.id, tooltipX + padding, currentY);
+  ctx.restore();
+  currentY += lineHeight + 6;
   
+  // Role with color
+  ctx.save();
   ctx.fillStyle = getRoleColor(agent.role);
-  ctx.font = '11px sans-serif';
-  ctx.fillText(agent.role, tooltipX + 15, tooltipY + 45);
+  ctx.font = '500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillText(`角色: ${agent.role}`, tooltipX + padding, currentY);
+  ctx.restore();
+  currentY += lineHeight;
   
-  ctx.fillStyle = '#888888';
-  ctx.fillText(`状态：${agent.status || 'idle'}`, tooltipX + 15, tooltipY + 70);
+  // Status with colored dot
+  ctx.save();
+  const statusColor = agent.status === 'online' ? '#00ffa3' : agent.status === 'busy' ? '#fbbf24' : '#888888';
+  ctx.fillStyle = statusColor;
+  ctx.font = '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.fillText(`● ${agent.status || 'idle'}`, tooltipX + padding, currentY);
+  ctx.restore();
+  currentY += lineHeight;
   
+  // Separator line with gradient effect
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(tooltipX + padding, currentY - 8);
+  ctx.lineTo(tooltipX + tooltipWidth - padding, currentY - 8);
+  ctx.stroke();
+  ctx.restore();
+  
+  // Last Active
+  ctx.save();
+  ctx.fillStyle = '#bbbbbb';
+  ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowBlur = 2;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
   const lastActive = agent.lastHeartbeat ? formatTime(new Date(agent.lastHeartbeat).toISOString()) : '-';
-  ctx.fillText(`最后活跃：${lastActive}`, tooltipX + 15, tooltipY + 90);
+  ctx.fillText(`最后活跃: ${lastActive}`, tooltipX + padding, currentY);
+  ctx.restore();
+  currentY += lineHeight;
   
-  ctx.fillStyle = '#666666';
-  ctx.font = '10px sans-serif';
-  ctx.fillText('点击查看详情', tooltipX + 15, tooltipY + 110);
+  // Callback URL (if exists)
+  if (agent.callbackUrl) {
+    ctx.save();
+    ctx.fillStyle = '#999999';
+    ctx.font = '11px "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 1;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    const url = agent.callbackUrl.length > 28 ? agent.callbackUrl.substring(0, 25) + '...' : agent.callbackUrl;
+    ctx.fillText(`回调: ${url}`, tooltipX + padding, currentY);
+    ctx.restore();
+    currentY += lineHeight;
+  }
+  
+  // Registered At
+  if (agent.registeredAt) {
+    ctx.save();
+    ctx.fillStyle = '#999999';
+    ctx.font = '11px "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 1;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    const regTime = formatTime(new Date(agent.registeredAt).toISOString());
+    ctx.fillText(`注册: ${regTime}`, tooltipX + padding, currentY);
+    ctx.restore();
+    currentY += lineHeight;
+  }
+  
+  // Heartbeat Interval
+  if (agent.heartbeatInterval) {
+    ctx.save();
+    ctx.fillStyle = '#999999';
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 1;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(`心跳间隔: ${agent.heartbeatInterval}s`, tooltipX + padding, currentY);
+    ctx.restore();
+    currentY += lineHeight;
+  }
+  
+  // Message Stats
+  const sent = agent.messagesSent || agent.messageStats?.sent || 0;
+  const received = agent.messagesReceived || agent.messageStats?.received || 0;
+  if (sent > 0 || received > 0) {
+    ctx.save();
+    ctx.fillStyle = '#00d4ff';
+    ctx.font = '500 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText(`📤 ${sent}  📥 ${received}`, tooltipX + padding, currentY);
+    ctx.restore();
+  }
 }
 
 function getRoleColor(role) {
@@ -645,9 +878,11 @@ function getRoleColor(role) {
     manager: '#ff6b6b',
     developer: '#00d4ff',
     reviewer: '#00ffa3',
-    tester: '#fbbf24'
+    tester: '#fbbf24',
+    writer: '#a855f7',
+    editor: '#ec4899'
   };
-  return colors[role] || '#888';
+  return colors[role] || '#888888';
 }
 
 // ============================================================================

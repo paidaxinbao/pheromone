@@ -102,11 +102,18 @@ async function processWithOpenClaw(incomingMessage) {
   console.log(`[${AGENT_ID}] Processing with OpenClaw...`);
 
   try {
-    // Call OpenClaw CLI with explicit session
+    // Call OpenClaw CLI with OPENCLAW_CONFIG environment variable
     const sessionId = `swarm-${AGENT_ID}-${Date.now()}`;
     const { stdout } = await execPromise(
-      `openclaw agent --session-id "${sessionId}" --agent ${AGENT_ID} --message "${prompt.replace(/"/g, '\\"')}"`,
-      { timeout: 60000, env: { ...process.env, OPENCLAW_WORKSPACE: '/app/workspace' } }
+      `openclaw agent --session-id "${sessionId}" --message "${prompt.replace(/"/g, '\\"')}"`,
+      { 
+        timeout: 120000, 
+        env: { 
+          ...process.env,
+          OPENCLAW_CONFIG: '/app/workspace/openclaw.json',
+          OPENCLAW_WORKSPACE: '/app/workspace'
+        } 
+      }
     );
 
     console.log(`[${AGENT_ID}] OpenClaw response received`);

@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Dashboard
+  dashboard:
+    image: nginx:alpine
+    container_name: pheromone-dashboard
+    ports:
+      - "18890:80"
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+    networks:
+      - pheromone-net
+    restart: unless-stopped
+
+  # Agent 1 - Developer
+  agent-dev-1:
+    image: node:20-alpine
+    container_name: pheromone-agent-dev-1
+    environment:
+      - AGENT_ID=dev-1
+      - AGENT_ROLE=developer
+      - HUB_URL=http://hub:18888
+    volumes:
+      - ./agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "agent-stub.js"]
+    networks:
+      - pheromone-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 2 - Reviewer
+  agent-rev-1:
+    image: node:20-alpine
+    container_name: pheromone-agent-rev-1
+    environment:
+      - AGENT_ID=rev-1
+      - AGENT_ROLE=reviewer
+      - HUB_URL=http://hub:18888
+    volumes:
+      - ./agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "agent-stub.js"]
+    networks:
+      - pheromone-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Agent 3 - Tester
+  agent-test-1:
+    image: node:20-alpine
+    container_name: pheromone-agent-test-1
+    environment:
+      - AGENT_ID=test-1
+      - AGENT_ROLE=tester
+      - HUB_URL=http://hub:18888
+    volumes:
+      - ./agent-runtime:/app:ro
+    working_dir: /app
+    command: ["node", "agent-stub.js"]
+    networks:
+      - pheromone-net
+    depends_on:
+      - hub
+    restart: unless-stopped
+
+  # Hub
+  hub:
+    image: node:20-alpine
+    container_name: pheromone-hub
+    container_name: pheromone-hub
+    ports:
+      - "18888:18888"
+    volumes:
+      - ./hub:/app:ro
+    working_dir: /app
+    command: ["node", "hub-server.js"]
+    networks:
+      - pheromone-net
+    restart: unless-stopped
+
+networks:
+  pheromone-net:
+    driver: bridge

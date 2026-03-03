@@ -1,132 +1,141 @@
 /**
- * Callback Dispatcher - Webhook Callback Module
- * Sends messages to Agent callback URLs with retry logic
+ * CallbackDispatcher - Webhook 推送模块
+ * 
+ * 职责:
+ * - 接收 agentId + message，查 AgentRegistry 取 callbackUrl
+ * - 向 callbackUrl 发起 HTTP POST 推送消息
+ * - 推送失败：消息入队列，启动指数退避重试（2s → 4s → 8s，最多 3 次）
+ * - 全部重试失败：消息留在队列，等 Agent 恢复后通过心跳/轮询取回
+ * - 无 callbackUrl：直接入队，走原有轮询路径（兜底）
  */
 
 const http = require('http');
-const https = require('https');
-const url = require('url');
 
 class CallbackDispatcher {
   constructor(registry, queue, options = {}) {
     this.registry = registry;
     this.queue = queue;
     this.maxRetries = options.maxRetries || 3;
-    this.retryBaseDelay = options.retryBaseDelay || 2000;
+    this.baseDelay = options.retryBaseDelay || 2000;
     this.callbackTimeout = options.callbackTimeout || 10000;
-    this.pendingRetries = new Map();
   }
 
+  /**
+   * 推送消息给单个 Agent
+   * @param {string} agentId 
+   * @param {object} message 
+   * @returns {Promise<{success: boolean, delivered: boolean, reason?: string}>}
+   */
   async push(agentId, message) {
     const agent = this.registry.get(agentId);
-
-    if (!agent || !agent.callbackUrl) {
-      this.queue.enqueue(agentId, message);
-      return { delivered: false, reason: 'no_callback_url', queued: true };
+    
+    if (!agent) {
+      console.log(`[CallbackDispatcher] Agent ${agentId} not found, queuing message`);
+      this.queue.enqueue(message);
+      return { success: true, delivered: false, reason: 'agent_not_found' };
     }
 
-    if (agent.status === 'offline') {
-      this.queue.enqueue(agentId, message);
-      return { delivered: false, reason: 'agent_offline', queued: true };
+    const callbackUrl = agent.callbackUrl;
+    
+    if (!callbackUrl) {
+      console.log(`[CallbackDispatcher] Agent ${agentId} has no callbackUrl, queuing message`);
+      this.queue.enqueue(message);
+      return { success: true, delivered: false, reason: 'no_callback_url' };
     }
 
-    try {
-      await this._httpPost(agent.callbackUrl, message);
-      return { delivered: true };
-    } catch (err) {
-      console.error(
-        `[CallbackDispatcher] Push to ${agentId} failed: ${err.message}`
-      );
-      this.queue.enqueue(agentId, message);
-      this._scheduleRetry(agentId, message, 0);
-      return { delivered: false, reason: err.message, queued: true };
-    }
-  }
-
-  async pushBroadcast(message, excludeAgentId = null) {
-    const agents = this.registry.getAll().filter(
-      (a) => a.status !== 'offline' && a.id !== excludeAgentId
-    );
-    const results = [];
-
-    for (const agent of agents) {
-      const result = await this.push(agent.id, message);
-      results.push({ agentId: agent.id, ...result });
-    }
-
-    return results;
-  }
-
-  _scheduleRetry(agentId, message, attempt) {
-    if (attempt >= this.maxRetries) {
-      console.error(
-        `[CallbackDispatcher] Max retries reached for ${agentId}, message stays in queue`
-      );
-      return;
-    }
-
-    const delay = this.retryBaseDelay * Math.pow(2, attempt);
-    const jitter = delay * 0.25 * Math.random();
-
-    setTimeout(async () => {
-      const agent = this.registry.get(agentId);
-      if (!agent || !agent.callbackUrl || agent.status === 'offline') return;
-
+    // 尝试推送，失败则重试
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        await this._httpPost(agent.callbackUrl, message);
-        console.log(
-          `[CallbackDispatcher] Retry succeeded for ${agentId} (attempt ${attempt + 1})`
-        );
-      } catch (err) {
-        console.error(
-          `[CallbackDispatcher] Retry ${attempt + 1} failed for ${agentId}: ${err.message}`
-        );
-        this._scheduleRetry(agentId, message, attempt + 1);
+        const delivered = await this._httpPost(callbackUrl, message);
+        
+        if (delivered) {
+          console.log(`[CallbackDispatcher] → ${agentId}: delivered`);
+          return { success: true, delivered: true };
+        }
+      } catch (error) {
+        console.log(`[CallbackDispatcher] → ${agentId}: attempt ${attempt} failed - ${error.message}`);
+        
+        if (attempt < this.maxRetries) {
+          const delay = this.baseDelay * Math.pow(2, attempt - 1);
+          console.log(`[CallbackDispatcher] Retrying in ${delay}ms...`);
+          await this._sleep(delay);
+        }
       }
-    }, delay + jitter);
+    }
+
+    // 全部重试失败，消息入队列
+    console.log(`[CallbackDispatcher] → ${agentId}: all retries failed, queuing message`);
+    this.queue.enqueue(message);
+    return { success: true, delivered: false, reason: 'all_retries_failed' };
   }
 
-  _httpPost(callbackUrl, body) {
+  /**
+   * 广播消息给所有 Agent
+   * @param {object} message 
+   * @returns {Promise<{success: boolean, delivered: number, failed: number}>}
+   */
+  async pushBroadcast(message) {
+    const agents = this.registry.getAll();
+    const results = await Promise.allSettled(
+      agents.map(agent => this.push(agent.id, message))
+    );
+
+    const delivered = results.filter(r => r.status === 'fulfilled' && r.value.delivered).length;
+    const failed = results.length - delivered;
+
+    console.log(`[CallbackDispatcher] Broadcast: ${delivered} delivered, ${failed} failed`);
+    return { success: true, delivered, failed };
+  }
+
+  /**
+   * HTTP POST 请求
+   * @param {string} url 
+   * @param {object} data 
+   * @returns {Promise<boolean>}
+   */
+  _httpPost(url, data) {
     return new Promise((resolve, reject) => {
-      const parsed = new URL(callbackUrl);
-      const transport = parsed.protocol === 'https:' ? https : http;
+      const parsed = new URL(url);
+      const body = JSON.stringify(data);
 
-      const data = JSON.stringify(body);
-      const options = {
-        hostname: parsed.hostname,
-        port: parsed.port,
-        path: parsed.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(data),
-          'X-Pheromone-Hub': 'true',
+      const req = http.request(
+        {
+          hostname: parsed.hostname,
+          port: parsed.port || 80,
+          path: parsed.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Length': Buffer.byteLength(body),
+          },
+          timeout: 5000,
         },
-        timeout: this.callbackTimeout,
-      };
+        (res) => {
+          let responseBody = '';
+          res.on('data', (chunk) => (responseBody += chunk));
+          res.on('end', () => {
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              resolve(true);
+            } else {
+              reject(new Error(`HTTP ${res.statusCode}`));
+            }
+          });
+        }
+      );
 
-      const req = transport.request(options, (res) => {
-        let responseBody = '';
-        res.on('data', (chunk) => (responseBody += chunk));
-        res.on('end', () => {
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(responseBody);
-          } else {
-            reject(new Error(`HTTP ${res.statusCode}: ${responseBody}`));
-          }
-        });
-      });
-
+      req.on('error', reject);
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error('Callback timeout'));
+        reject(new Error('Timeout'));
       });
-
-      req.on('error', (err) => reject(err));
-      req.write(data);
+      req.write(body);
       req.end();
     });
   }
+
+  _sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 }
 
-module.exports = { CallbackDispatcher };
+module.exports = CallbackDispatcher;
