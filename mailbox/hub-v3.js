@@ -281,6 +281,17 @@ class MailboxHub {
       };
     }
     
+    if (method === 'GET' && pathname === '/protection/stats') {
+      return {
+        status: 200,
+        body: {
+          success: true,
+          conversationManager: this.conversationManager.getStats(),
+          cooldownManager: this.cooldownManager.getStats()
+        }
+      };
+    }
+    
     if (method === 'GET' && pathname === '/messages') {
       const agentId = query.agentId;
       if (!agentId) {
