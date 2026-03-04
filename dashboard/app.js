@@ -127,6 +127,7 @@ async function updateDashboard() {
     const agentsData = await fetch(`${API_BASE}/agents`).then(r => r.json());
     const queuesData = await fetch(`${API_BASE}/queues`).then(r => r.json());
     const schedulerStats = await fetch(`${API_BASE}/scheduler/stats`).then(r => r.json());
+    const protectionStats = await fetch(`${API_BASE}/protection/stats`).then(r => r.json());
     
     agents = agentsData.agents || [];
     console.log('Agents updated:', agents.length, agents.map(a => a.id));
@@ -177,9 +178,12 @@ async function updateDashboard() {
     document.getElementById('queue-max').textContent = maxQueue > 0 ? maxQueue : '-';
     document.getElementById('queue-agents').textContent = Object.keys(queues).length;
     
-    // Update protection layer stats (placeholder - will be implemented later)
-    document.getElementById('conv-active').textContent = '0';
-    document.getElementById('cooldown-active').textContent = '0';
+    // Update protection layer stats
+    const conv = protectionStats.conversationManager || {};
+    const cooldown = protectionStats.cooldownManager || {};
+    
+    document.getElementById('conv-active').textContent = conv.activeConversations || 0;
+    document.getElementById('cooldown-active').textContent = cooldown.activeCooldowns || 0;
     
     // Update message count
     document.getElementById('message-count').textContent = health.messages || 0;
