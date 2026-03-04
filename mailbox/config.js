@@ -1,90 +1,103 @@
 /**
- * Mailbox Configuration
+ * Mailbox Configuration v3
  * 
  * 配置说明:
- * - 核心组件配置: Agent状态管理、消息队列、调度器、广播过滤
- * - 保护层配置: 对话管理器、冷却期管理器
+ * - 核心组件配置：Agent 状态管理、消息队列、调度器、广播过滤
+ * - 保护层配置：对话管理器、冷却期管理器
+ * - 支持环境变量覆盖（Docker 部署用）
  * 
- * @version 2.0.0
+ * @version 3.0.0
  */
+
+const env = (key, defaultVal, parser = parseInt) => {
+  const val = process.env[key];
+  if (val === undefined) return defaultVal;
+  if (typeof defaultVal === 'boolean') {
+    return val.toLowerCase() === 'true' || val === '1';
+  }
+  if (typeof defaultVal === 'number') {
+    return parser(val);
+  }
+  return val;
+};
 
 module.exports = {
   // ===== 核心组件配置 =====
   
   // Agent 状态管理
   agentState: {
-    maxConcurrentMessages: 1,      // 每个Agent同时处理1条消息
-    busyTimeout: 300000,            // 5分钟超时（毫秒）
-    offlineTimeout: 90000,          // 90秒离线判定
-    suspendedAutoRecovery: false    // 不自动恢复挂起的Agent
+    maxConcurrentMessages: env('AGENT_STATE_MAX_CONCURRENT', 1),
+    busyTimeout: env('AGENT_STATE_BUSY_TIMEOUT', 300000),
+    offlineTimeout: env('AGENT_STATE_OFFLINE_TIMEOUT', 90000),
+    suspendedAutoRecovery: env('AGENT_STATE_SUSPENDED_AUTO_RECOVERY', false)
   },
 
   // 消息队列
   messageQueue: {
-    maxQueueSize: 50,               // 每个Agent队列最大50条
-    dropStrategy: 'oldest-low-priority',  // 丢弃策略
-    enablePrioritySort: false       // TODO: 未来启用优先级排序
+    maxQueueSize: env('MESSAGE_QUEUE_MAX_SIZE', 50),
+    dropStrategy: env('MESSAGE_QUEUE_DROP_STRATEGY', 'oldest-low-priority'),
+    enablePrioritySort: env('MESSAGE_QUEUE_ENABLE_PRIORITY_SORT', false)
   },
 
   // 调度器
   scheduler: {
-    interval: 500,                  // 0.5秒调度间隔（毫秒）
-    enabled: true,
-    maxDeliveryRetries: 3           // 最大重试次数
+    interval: env('SCHEDULER_INTERVAL', 500),
+    enabled: env('SCHEDULER_ENABLED', true),
+    maxDeliveryRetries: env('SCHEDULER_MAX_DELIVERY_RETRIES', 3)
   },
 
   // 广播过滤
   broadcastFilter: {
-    enabled: true,
-    maxRecipients: 4,               // 最多4个接收者（宽松）
-    minRecipients: 2,               // 最少2个接收者
-    strategy: 'role-based',         // round-robin | random | role-based
-    fallbackToAll: false            // 没有合适接收者时不发给所有人
+    enabled: env('BROADCAST_ENABLED', true),
+    maxRecipients: env('BROADCAST_MAX_RECIPIENTS', 4),
+    minRecipients: env('BROADCAST_MIN_RECIPIENTS', 2),
+    strategy: env('BROADCAST_STRATEGY', 'role-based'),
+    fallbackToAll: env('BROADCAST_FALLBACK_TO_ALL', false)
   },
 
   // ===== 保护层配置 =====
   
   // 对话管理器（保护层）
   conversationManager: {
-    enabled: true,
-    maxMessagesIn5Minutes: 50,
-    maxMessagesPerMinute: 10,
-    expirationTime: 1800000,        // 30分钟（毫秒）
-    autoPauseEnabled: true          // 自动暂停活跃对话
+    enabled: env('CONVERSATION_ENABLED', true),
+    maxMessagesIn5Minutes: env('CONVERSATION_MAX_MESSAGES_5MIN', 50),
+    maxMessagesPerMinute: env('CONVERSATION_MAX_MESSAGES_1MIN', 10),
+    expirationTime: env('CONVERSATION_EXPIRATION_TIME', 1800000),
+    autoPauseEnabled: env('CONVERSATION_AUTO_PAUSE_ENABLED', true)
   },
 
   // 冷却期管理器（保护层）
   cooldownManager: {
-    enabled: true,
-    period: 10000,                  // 10秒冷却期（毫秒）
-    applyToAll: false               // 不应用于广播消息
+    enabled: env('COOLDOWN_ENABLED', true),
+    period: env('COOLDOWN_PERIOD', 10000),
+    applyToAll: env('COOLDOWN_APPLY_TO_ALL', false)
   },
 
   // ===== 其他配置 =====
   
   // Hub 基础配置
   hub: {
-    port: process.env.MAILBOX_PORT || 18888,
-    host: process.env.MAILBOX_HOST || '0.0.0.0',
-    heartbeatInterval: 30000,
-    heartbeatTimeout: 90000,
-    messageRetention: 3600000,
-    persistMessages: true,
-    callbackTimeout: 10000,
-    maxRetries: 3
+    port: env('MAILBOX_PORT', 18888),
+    host: env('MAILBOX_HOST', '0.0.0.0'),
+    heartbeatInterval: env('HUB_HEARTBEAT_INTERVAL', 30000),
+    heartbeatTimeout: env('HUB_HEARTBEAT_TIMEOUT', 90000),
+    messageRetention: env('MESSAGE_RETENTION', 3600000),
+    persistMessages: env('PERSIST_MESSAGES', true),
+    callbackTimeout: env('CALLBACK_TIMEOUT', 10000),
+    maxRetries: env('CALLBACK_MAX_RETRIES', 3)
   },
 
   // 优先级（暂不实现）
   priority: {
-    enabled: false,                 // TODO: 未来实现优先级排序
-    starvationPrevention: false     // TODO: 防止低优先级消息饿死
+    enabled: false,
+    starvationPrevention: false
   },
 
   // 日志
   logging: {
-    level: 'info',                  // debug | info | warn | error
-    logStateChanges: true,          // 记录状态变化
-    logQueueOperations: true,       // 记录队列操作
-    logScheduling: true             // 记录调度过程
+    level: env('LOG_LEVEL', 'info'),
+    logStateChanges: env('LOG_STATE_CHANGES', true),
+    logQueueOperations: env('LOG_QUEUE_OPERATIONS', true),
+    logScheduling: env('LOG_SCHEDULING', true)
   }
 };

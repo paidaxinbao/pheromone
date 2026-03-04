@@ -162,6 +162,24 @@ class AgentStateManager {
   }
 
   /**
+   * 更新 Agent 状态
+   * @param {string} agentId 
+   * @param {string} status 
+   */
+  updateStatus(agentId, status) {
+    const state = this.states.get(agentId);
+    if (!state) return;
+    
+    const oldStatus = state.status;
+    state.status = status;
+    state.lastActivity = Date.now();
+    
+    if (oldStatus !== status) {
+      this.log.debug(`Agent ${agentId} status changed: ${oldStatus} → ${status}`);
+    }
+  }
+
+  /**
    * 标记为挂起
    * @param {string} agentId 
    * @param {string} reason 

@@ -2,13 +2,13 @@ version: "3.8"
 
 services:
   # ============================================================================
-  # Pheromone Hub
+  # Pheromone Hub v3
   # ============================================================================
   hub:
     build:
       context: .
       dockerfile: Dockerfile.hub
-    container_name: pheromone-hub
+    container_name: pheromone-hub-v3
     ports:
       - "18888:18888"
     volumes:
@@ -16,11 +16,29 @@ services:
     networks:
       - swarm-net
     restart: unless-stopped
+    environment:
+      # Hub v3 Configuration
+      MAILBOX_PORT: "18888"
+      MAILBOX_HOST: "0.0.0.0"
+      # Agent State Management
+      AGENT_STATE_MAX_CONCURRENT: "1"
+      AGENT_STATE_BUSY_TIMEOUT: "300000"
+      # Message Queue
+      MESSAGE_QUEUE_MAX_SIZE: "50"
+      # Scheduler
+      SCHEDULER_INTERVAL: "500"
+      # Broadcast Filter
+      BROADCAST_MAX_RECIPIENTS: "4"
+      # Conversation Manager
+      CONVERSATION_MAX_MESSAGES: "50"
+      # Cooldown Manager
+      COOLDOWN_PERIOD: "10000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18888/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   # ============================================================================
   # Dashboard
