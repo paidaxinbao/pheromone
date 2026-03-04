@@ -145,6 +145,7 @@ class MessageScheduler {
    */
   async deliverNextMessage(agent) {
     const agentId = agent.id;
+    const callbackUrl = agent.callbackUrl;
     
     // 检查队列是否有消息
     const queueSize = this.queue ? this.queue.getQueueSize(agentId) : 0;
@@ -162,6 +163,12 @@ class MessageScheduler {
         this.log.debug(`Agent ${agentId} cannot receive: ${reason}`);
         return;
       }
+    }
+    
+    // 如果没有 callbackUrl，不主动推送，等 Agent 自己来轮询
+    if (!callbackUrl) {
+      this.log.debug(`Agent ${agentId} has no callbackUrl, skipping push (agent should poll)`);
+      return;
     }
     
     // 取出消息

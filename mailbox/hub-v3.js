@@ -455,7 +455,7 @@ class MailboxHub {
       
       if (!agentState) {
         // Agent not registered, queue the message
-        const result = this.queue.enqueue(recipient.id, message);
+        const result = this.queue.enqueue(recipient.id, message, 'normal');
         return { success: true, messageId: result.messageId, queued: true };
       }
       
@@ -464,7 +464,7 @@ class MailboxHub {
       
       if (!canReceive) {
         // Queue the message
-        const result = this.queue.enqueue(recipient.id, message);
+        const result = this.queue.enqueue(recipient.id, message, 'normal');
         logger.debug(`Agent ${recipient.id} cannot receive (${reason}), message queued`);
         return { success: true, messageId: result.messageId, queued: true, reason };
       }
