@@ -122,25 +122,67 @@ function resetSwarmView() {
 
 async function updateDashboard() {
   try {
+    // Fetch all Hub v3 data
     const health = await fetch(`${API_BASE}/health`).then(r => r.json());
     const agentsData = await fetch(`${API_BASE}/agents`).then(r => r.json());
+    const queuesData = await fetch(`${API_BASE}/queues`).then(r => r.json());
+    const schedulerStats = await fetch(`${API_BASE}/scheduler/stats`).then(r => r.json());
     
     agents = agentsData.agents || [];
     console.log('Agents updated:', agents.length, agents.map(a => a.id));
     
     // Update landing page
     document.getElementById('landing-agents').textContent = health.agents;
-    document.getElementById('landing-messages').textContent = health.messages;
+    document.getElementById('landing-messages').textContent = health.messages || 0;
     document.getElementById('landing-uptime').textContent = formatUptime(health.uptime);
     
-    // Update dashboard
+    // Update Hub status
     document.getElementById('hub-status').innerHTML = `
       <span class="dot online"></span>
       <span>在线</span>
     `;
     document.getElementById('hub-uptime').textContent = formatUptime(health.uptime);
-    document.getElementById('agent-count').textContent = health.agents;
-    document.getElementById('message-count').textContent = health.messages;
+    
+    // Update scheduler stats
+    const sched = schedulerStats.scheduler || schedulerStats;
+    const successRate = sched.successRate || '0%';
+    const successCount = sched.successfulDeliveries || 0;
+    const failCount = sched.failedDeliveries || 0;
+    
+    document.getElementById('scheduler-rate').textContent = successRate;
+    document.getElementById('scheduler-success').textContent = `${successCount}/${successCount + failCount}`;
+    document.getElementById('scheduler-interval').textContent = `${sched.interval || 500}ms`;
+    
+    // Update agent count and status breakdown
+    document.getElementById('agent-count').textContent = agents.length;
+    
+    const statusCounts = {
+      idle: agents.filter(a => a.status === 'idle').length,
+      busy: agents.filter(a => a.status === 'busy').length,
+      suspended: agents.filter(a => a.status === 'suspended').length,
+      offline: agents.filter(a => a.status === 'offline').length
+    };
+    
+    document.getElementById('agent-idle').textContent = statusCounts.idle;
+    document.getElementById('agent-busy').textContent = statusCounts.busy;
+    document.getElementById('agent-suspended').textContent = statusCounts.suspended;
+    
+    // Update queue stats
+    const queues = queuesData.queues || {};
+    const totalMessages = queuesData.totalMessages || 0;
+    const queueSizes = Object.values(queues).map(q => q.size || 0);
+    const maxQueue = Math.max(...queueSizes, 0);
+    
+    document.getElementById('queue-total').textContent = totalMessages;
+    document.getElementById('queue-max').textContent = maxQueue > 0 ? maxQueue : '-';
+    document.getElementById('queue-agents').textContent = Object.keys(queues).length;
+    
+    // Update protection layer stats (placeholder - will be implemented later)
+    document.getElementById('conv-active').textContent = '0';
+    document.getElementById('cooldown-active').textContent = '0';
+    
+    // Update message count
+    document.getElementById('message-count').textContent = health.messages || 0;
     
     // Update agent list
     renderAgentList(agents);
@@ -161,6 +203,10 @@ async function updateDashboard() {
     }
   } catch (error) {
     console.error('Update failed:', error);
+    document.getElementById('hub-status').innerHTML = `
+      <span class="dot offline"></span>
+      <span>离线</span>
+    `;
   }
 }
 

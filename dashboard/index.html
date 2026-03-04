@@ -260,6 +260,27 @@
             <span class="metric-label">运行时间</span>
             <span class="metric-value" id="hub-uptime">-</span>
           </div>
+          <div class="metric">
+            <span class="metric-label">版本</span>
+            <span class="metric-value" style="font-size: 12px; color: #666;">v3.0</span>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h3>调度器</h3>
+          <div class="metric-large">
+            <span class="number" id="scheduler-rate">0%</span>
+          </div>
+          <div class="scheduler-stats" id="scheduler-stats">
+            <div class="mini-stat">
+              <span class="mini-stat-label">成功率</span>
+              <span class="mini-stat-value" id="scheduler-success">0/0</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-stat-label">间隔</span>
+              <span class="mini-stat-value" id="scheduler-interval">500ms</span>
+            </div>
+          </div>
         </div>
         
         <div class="card">
@@ -267,7 +288,45 @@
           <div class="metric-large">
             <span class="number" id="agent-count">0</span>
           </div>
+          <div class="agent-status-breakdown" id="agent-status-breakdown">
+            <span class="status-dot idle"></span><span id="agent-idle">0</span>
+            <span class="status-dot busy" style="margin-left: 8px;"></span><span id="agent-busy">0</span>
+            <span class="status-dot suspended" style="margin-left: 8px;"></span><span id="agent-suspended">0</span>
+          </div>
           <div class="agent-list" id="agent-list"></div>
+        </div>
+        
+        <div class="card">
+          <h3>消息队列</h3>
+          <div class="metric-large">
+            <span class="number" id="queue-total">0</span>
+          </div>
+          <div class="queue-stats" id="queue-stats">
+            <div class="mini-stat">
+              <span class="mini-stat-label">最大队列</span>
+              <span class="mini-stat-value" id="queue-max">-</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-stat-label">Agent</span>
+              <span class="mini-stat-value" id="queue-agents">0</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h3>保护层</h3>
+          <div class="protection-status" id="protection-status">
+            <div class="protection-item">
+              <span class="protection-icon">💬</span>
+              <span class="protection-label">对话管理</span>
+              <span class="protection-value" id="conv-active">0</span>
+            </div>
+            <div class="protection-item">
+              <span class="protection-icon">⏱️</span>
+              <span class="protection-label">冷却期</span>
+              <span class="protection-value" id="cooldown-active">0</span>
+            </div>
+          </div>
         </div>
         
         <div class="card">
@@ -333,6 +392,6 @@
     </div>
   </div>
   
-  <script src="app.js?v=20260303-1400"></script>
+  <script src="app.js?v=20260304-1200"></script>
 </body>
 </html>

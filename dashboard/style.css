@@ -763,6 +763,95 @@ header {
   background-clip: text;
 }
 
+/* Scheduler Stats */
+.scheduler-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.mini-stat {
+  text-align: center;
+  padding: 10px;
+  background: var(--bg-card-hover);
+  border-radius: 6px;
+}
+
+.mini-stat-label {
+  display: block;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.mini-stat-value {
+  display: block;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Agent Status Breakdown */
+.agent-status-breakdown {
+  text-align: center;
+  padding: 10px 0;
+  font-size: 0.85em;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.status-dot.idle { background: var(--success); }
+.status-dot.busy { background: var(--warning); }
+.status-dot.suspended { background: var(--danger); }
+.status-dot.offline { background: var(--text-muted); }
+
+/* Queue Stats */
+.queue-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* Protection Status */
+.protection-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.protection-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg-card-hover);
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+.protection-icon {
+  font-size: 1.2em;
+}
+
+.protection-label {
+  flex: 1;
+  color: var(--text-muted);
+}
+
+.protection-value {
+  font-weight: 600;
+  color: var(--success);
+}
+
 /* Agent List */
 .agent-list {
   margin-top: 20px;
