@@ -69,7 +69,7 @@ module.exports = {
   // 冷却期管理器（保护层）
   cooldownManager: {
     enabled: env('COOLDOWN_ENABLED', true),
-    period: env('COOLDOWN_PERIOD', 10000),
+    period: env('COOLDOWN_PERIOD', 3000),  // 临时方案：3 秒
     applyToAll: env('COOLDOWN_APPLY_TO_ALL', false)
   },
 
