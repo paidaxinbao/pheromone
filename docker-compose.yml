@@ -17,22 +17,15 @@ services:
       - swarm-net
     restart: unless-stopped
     environment:
-      # Hub v3 Configuration
       MAILBOX_PORT: "18888"
       MAILBOX_HOST: "0.0.0.0"
-      # Agent State Management
       AGENT_STATE_MAX_CONCURRENT: "1"
       AGENT_STATE_BUSY_TIMEOUT: "300000"
-      # Message Queue
       MESSAGE_QUEUE_MAX_SIZE: "50"
-      # Scheduler
       SCHEDULER_INTERVAL: "500"
-      # Broadcast Filter
       BROADCAST_MAX_RECIPIENTS: "4"
-      # Conversation Manager
-      CONVERSATION_MAX_MESSAGES: "50"
-      # Cooldown Manager
-      COOLDOWN_PERIOD: "10000"
+      CONVERSATION_MAX_MESSAGES_5MIN: "50"
+      COOLDOWN_PERIOD: "3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18888/health"]
       interval: 30s
@@ -60,112 +53,128 @@ services:
     restart: unless-stopped
 
   # ============================================================================
-  # Orchestrator Agent (Manager)
+  # Sci-Fi Movie Script Discussion Swarm (6 Agents)
   # ============================================================================
-  orchestrator:
+  
+  # 1. Director (导演) - 整体把控、叙事节奏
+  director:
     build:
       context: ./agent-runtime
-    container_name: orchestrator
+    container_name: swarm-director
     environment:
-      AGENT_ID: orchestrator
-      AGENT_ROLE: manager
+      AGENT_ID: director
+      AGENT_ROLE: director
+      AGENT_DESCRIPTION: "电影导演，负责整体叙事把控、节奏指导、最终决策"
       HUB_URL: http://hub:18888
       CALLBACK_PORT: "9000"
+      OPENCLAW_MODEL: "bailian/glm-5"
     depends_on:
       - hub
     networks:
       - swarm-net
     restart: unless-stopped
+    volumes:
+      - ./workspace-swarm/director:/app/workspace
 
-  # ============================================================================
-  # Developer Agent
-  # ============================================================================
-  developer:
+  # 2. Screenwriter (编剧) - 剧情结构、对白
+  screenwriter:
     build:
       context: ./agent-runtime
-    container_name: developer
+    container_name: swarm-screenwriter
     environment:
-      AGENT_ID: developer
-      AGENT_ROLE: developer
+      AGENT_ID: screenwriter
+      AGENT_ROLE: screenwriter
+      AGENT_DESCRIPTION: "编剧，负责剧情结构、场景设计、对白创作"
       HUB_URL: http://hub:18888
       CALLBACK_PORT: "9000"
+      OPENCLAW_MODEL: "bailian/glm-5"
     depends_on:
       - hub
     networks:
       - swarm-net
     restart: unless-stopped
+    volumes:
+      - ./workspace-swarm/screenwriter:/app/workspace
 
-  # ============================================================================
-  # Reviewer Agent
-  # ============================================================================
-  reviewer:
+  # 3. Science Advisor (科学顾问) - 硬科幻设定
+  science-advisor:
     build:
       context: ./agent-runtime
-    container_name: reviewer
+    container_name: swarm-science-advisor
     environment:
-      AGENT_ID: reviewer
-      AGENT_ROLE: reviewer
+      AGENT_ID: science-advisor
+      AGENT_ROLE: science-advisor
+      AGENT_DESCRIPTION: "科学顾问，负责硬科幻设定、物理规则、技术可行性"
       HUB_URL: http://hub:18888
       CALLBACK_PORT: "9000"
+      OPENCLAW_MODEL: "bailian/qwen3.5-plus"
     depends_on:
       - hub
     networks:
       - swarm-net
     restart: unless-stopped
+    volumes:
+      - ./workspace-swarm/science-advisor:/app/workspace
 
-  # ============================================================================
-  # Tester Agent
-  # ============================================================================
-  tester:
+  # 4. Visual Designer (视觉设计) - 场景、特效概念
+  visual-designer:
     build:
       context: ./agent-runtime
-    container_name: tester
+    container_name: swarm-visual-designer
     environment:
-      AGENT_ID: tester
-      AGENT_ROLE: tester
+      AGENT_ID: visual-designer
+      AGENT_ROLE: visual-designer
+      AGENT_DESCRIPTION: "视觉设计师，负责场景概念、视觉风格、特效设计"
       HUB_URL: http://hub:18888
       CALLBACK_PORT: "9000"
+      OPENCLAW_MODEL: "bailian/kimi-k2.5"
     depends_on:
       - hub
     networks:
       - swarm-net
     restart: unless-stopped
+    volumes:
+      - ./workspace-swarm/visual-designer:/app/workspace
 
-  # ============================================================================
-  # Writer Agent (科幻编剧)
-  # ============================================================================
-  writer:
+  # 5. Character Designer (角色设计) - 人物塑造
+  character-designer:
     build:
       context: ./agent-runtime
-    container_name: writer
+    container_name: swarm-character-designer
     environment:
-      AGENT_ID: writer
-      AGENT_ROLE: writer
+      AGENT_ID: character-designer
+      AGENT_ROLE: character-designer
+      AGENT_DESCRIPTION: "角色设计师，负责人物塑造、性格设定、角色弧光"
       HUB_URL: http://hub:18888
       CALLBACK_PORT: "9000"
+      OPENCLAW_MODEL: "bailian/kimi-k2.5"
     depends_on:
       - hub
     networks:
       - swarm-net
     restart: unless-stopped
+    volumes:
+      - ./workspace-swarm/character-designer:/app/workspace
 
-  # ============================================================================
-  # Editor Agent (剧本编辑)
-  # ============================================================================
-  editor:
+  # 6. Producer (制片人) - 可行性、市场分析
+  producer:
     build:
       context: ./agent-runtime
-    container_name: editor
+    container_name: swarm-producer
     environment:
-      AGENT_ID: editor
-      AGENT_ROLE: editor
+      AGENT_ID: producer
+      AGENT_ROLE: producer
+      AGENT_DESCRIPTION: "制片人，负责市场可行性、预算评估、观众定位"
       HUB_URL: http://hub:18888
       CALLBACK_PORT: "9000"
+      OPENCLAW_MODEL: "bailian/kimi-k2.5"
     depends_on:
       - hub
     networks:
       - swarm-net
     restart: unless-stopped
+    volumes:
+      - ./workspace-swarm/producer:/app/workspace
 
 # ==============================================================================
 # Volumes
