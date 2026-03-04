@@ -178,8 +178,9 @@ class MessageScheduler {
       return;
     }
     
-    const message = messages[0];
-    const messageId = message._id || message.id;
+    const queuedMessage = messages[0];
+    const message = queuedMessage.message || queuedMessage;  // 兼容两种格式
+    const messageId = message._id || message.id || `queued-${Date.now()}`;  // 兜底生成 ID
     
     this.log.info(`Delivering message ${messageId} to ${agentId}`);
     
