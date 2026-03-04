@@ -358,6 +358,14 @@ class AgentStateManager {
   }
 
   /**
+   * 获取 Agent 数量
+   * @returns {number}
+   */
+  count() {
+    return this.states.size;
+  }
+
+  /**
    * 获取统计信息
    * @returns {object}
    */

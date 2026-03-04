@@ -31,7 +31,7 @@ class CallbackDispatcher {
     
     if (!agent) {
       console.log(`[CallbackDispatcher] Agent ${agentId} not found, queuing message`);
-      this.queue.enqueue(message);
+      this.queue.enqueue(agentId, message);
       return { success: true, delivered: false, reason: 'agent_not_found' };
     }
 
@@ -39,7 +39,7 @@ class CallbackDispatcher {
     
     if (!callbackUrl) {
       console.log(`[CallbackDispatcher] Agent ${agentId} has no callbackUrl, queuing message`);
-      this.queue.enqueue(message);
+      this.queue.enqueue(agentId, message);
       return { success: true, delivered: false, reason: 'no_callback_url' };
     }
 

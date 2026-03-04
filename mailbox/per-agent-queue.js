@@ -293,6 +293,18 @@ class PerAgentQueue {
   }
 
   /**
+   * 获取所有队列的总消息数
+   * @returns {number}
+   */
+  getTotalQueued() {
+    let total = 0;
+    for (const queue of this.queues.values()) {
+      total += queue.length;
+    }
+    return total;
+  }
+
+  /**
    * 获取统计信息
    * @returns {object}
    */
@@ -300,7 +312,7 @@ class PerAgentQueue {
     return {
       ...this.stats,
       totalQueues: this.queues.size,
-      totalMessages: this.getTotalSize()
+      totalMessages: this.getTotalQueued()
     };
   }
 }
